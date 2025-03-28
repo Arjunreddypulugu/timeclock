@@ -6,6 +6,7 @@ from db_config import get_connection
 from utils import find_customer_from_location
 from streamlit_geolocation import streamlit_geolocation
 
+# App Configuration
 st.set_page_config(page_title="Time Clock", layout="centered")
 st.title("🕒 Time Clock")
 
@@ -14,42 +15,39 @@ st.title("🕒 Time Clock")
 query_params = st.query_params
 sub = query_params.get("sub")
 
-# Initialize device_id from session state or create new one
-if "device_id" not in st.session_state:
-    st.session_state["device_id"] = str(uuid.uuid4())
-device_id = st.session_state["device_id"]
-
 if not sub:
     st.error("Missing subcontractor in URL. Use ?sub=Alpha%20Electrical")
     st.stop()
 
-st.markdown(f"👷 Subcontractor: {sub}")
+st.markdown(f"👷 Subcontractor: `{sub}`")
 
 # ─────────────────────────────────────────────
-# 2. Get location using streamlit-geolocation
+# 2. Auto-fetch Location
+# Fetch location automatically using streamlit-geolocation
 location = streamlit_geolocation()
 
 if location and 'latitude' in location and 'longitude' in location:
     lat = location['latitude']
     lon = location['longitude']
     st.session_state["location"] = (lat, lon)
+    
+    # Display fetched coordinates (optional for debugging)
     st.success(f"📌 Coordinates: ({lat:.5f}, {lon:.5f})")
     
-    # Display location on map
-    st.map(pd.DataFrame([{"lat": lat, "lon": lon}]))
-    
     # ─────────────────────────────────────────────
-    # 3. Customer match
+    # 3. Customer Lookup
     try:
-        conn = get_connection()
-        cursor = conn.cursor()
+        conn = get_connection()  # Connect to the database
+        customer = find_customer_from_location(lat, lon, conn)  # Match location to customer
         
-        customer = find_customer_from_location(lat, lon, conn)
         if not customer:
-            st.error("❌ Not a valid job site.")
-            st.stop()
+            st.error("❌ No matching customer found for this location.")
         else:
             st.success(f"🛠️ Work Site: {customer}")
+    except Exception as e:
+        st.error(f"Database error: {str(e)}")
+else:
+    st.info("⏳ Waiting for location... Please allow browser access to your location.")
         
         # ─────────────────────────────────────────────
         # 4. Registration
