@@ -5,22 +5,25 @@ import uuid
 from db_config import get_connection
 from utils import find_customer_from_location
 import pyodbc
+import pandas as pd
 
 st.set_page_config(page_title="Time Clock", layout="centered")
 st.title("🕒 Time Clock")
 
-# 🔹 Get subcontractor from query params
+# ─────────────────────────────
+# Get subcontractor from URL
 query_params = st.query_params
 sub = query_params.get("sub")
-device_id = str(uuid.uuid4())  # Temporary device ID per session
+device_id = str(uuid.uuid4())  # Simulated device ID
 
 if not sub:
-    st.error("Missing subcontractor in URL. Use a valid link like '?sub=Alpha%20Electrical'")
+    st.error("Missing subcontractor in URL. Use ?sub=Alpha%20Electrical")
     st.stop()
 
 st.markdown(f"**👷 Subcontractor:** `{sub}`")
 
-# 🔹 Capture and inject location from browser into text_input
+# ─────────────────────────────
+# Inject JavaScript to get browser location
 if "location" not in st.session_state:
     st.session_state["location"] = None
 
@@ -58,24 +61,39 @@ else:
     try:
         lat, lon = map(float, location_input.split(","))
         st.session_state["location"] = (lat, lon)
-        st.success(f"📌 Location detected: ({lat:.4f}, {lon:.4f})")
+        st.success(f"📌 Location: ({lat:.4f}, {lon:.4f})")
+
+        # Show user location on map
+        st.map(pd.DataFrame([{"lat": lat, "lon": lon}]))
     except:
         st.error("❌ Invalid location format.")
         st.stop()
 
-# 🔹 Check site match from location
+# ─────────────────────────────
+# Check customer site from location
 conn = get_connection()
 cursor = conn.cursor()
 lat, lon = st.session_state["location"]
 
 customer = find_customer_from_location(lat, lon, conn)
 if not customer:
-    st.error("❌ You're not on a valid work site.")
+    st.error("❌ You are not on a valid work site.")
+    
+    # Log to FailedGPSLog
+    timestamp = datetime.now()
+    cursor.execute("""
+        INSERT INTO FailedGPSLog (Timestamp, SubContractor, Lat, Lon)
+        VALUES (?, ?, ?, ?)
+    """, timestamp, sub, lat, lon)
+    conn.commit()
+    
+    st.info("⚠️ Your location has been logged for admin review.")
     st.stop()
 else:
-    st.success(f"🛠️ Site: {customer}")
+    st.success(f"🛠️ Work Site: {customer}")
 
-# 🔹 Check if device already recognized
+# ─────────────────────────────
+# Cookie lookup (simulate device ID)
 cursor.execute("SELECT * FROM SubContractorEmployees WHERE Cookies = ?", device_id)
 record = cursor.fetchone()
 
@@ -100,7 +118,8 @@ if not record:
 else:
     st.info("✅ Device recognized. Welcome back!")
 
-# 🔹 Clock In / Clock Out options
+# ─────────────────────────────
+# Clock In / Out
 action = st.radio("Select action:", ["Clock In", "Clock Out"])
 
 if st.button("Submit"):
