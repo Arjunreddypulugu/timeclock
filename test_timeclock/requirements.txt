@@ -3,3 +3,4 @@ pyodbc
 geopy
 streamlit-js-eval
 streamlit-geolocation
+pandas
