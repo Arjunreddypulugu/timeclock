@@ -6,116 +6,100 @@ from db_config import get_connection
 from utils import find_customer_from_location
 import pyodbc
 
+st.set_page_config(page_title="Time Clock", layout="centered")
 st.title("🕒 Time Clock")
 
-# ───────────────────────────────
-# JavaScript to fetch geolocation
-components.html("""
-<script>
-navigator.geolocation.getCurrentPosition(
-    function(position) {
-        const coords = position.coords.latitude + "," + position.coords.longitude;
-        const url = new URL(window.location.href);
-        url.searchParams.set("location", coords);
-        window.location.href = url.toString();
-    },
-    function(error) {
-        const url = new URL(window.location.href);
-        url.searchParams.set("location", "ERROR");
-        window.location.href = url.toString();
-    }
-);
-</script>
-""", height=0)
-
-# ───────────────────────────────
-# Get query parameters the new way
+# 🔹 Step 1: Get query parameters
 query_params = st.query_params
+sub = query_params.get("sub")
+device_id = str(uuid.uuid4())  # Simulated device ID for testing
 
-location = query_params.get("location")
-user_param = query_params.get("user")
-device_id = query_params.get("device_id", str(uuid.uuid4()))
-
-# ───────────────────────────────
-# Location handling
-if not location or location == "ERROR":
-    st.warning("⚠️ Waiting for your device's location...")
+# 🔸 Error if no subcontractor provided
+if not sub:
+    st.error("Missing subcontractor in URL. Use a valid link like '?sub=Alpha%20Electrical'")
     st.stop()
 
-try:
-    lat, lon = map(float, location.split(","))
-except:
-    st.error("❌ Invalid location format.")
-    st.stop()
+st.markdown(f"**👷 Subcontractor:** `{sub}`")
 
-st.session_state['lat'] = lat
-st.session_state['lon'] = lon
+# 🔹 Step 2: JavaScript to fetch browser location and send it to Streamlit
+if "location" not in st.session_state:
+    components.html("""
+    <script>
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                const coords = position.coords.latitude + "," + position.coords.longitude;
+                localStorage.setItem("geo_location", coords);
+                window.parent.postMessage(coords, "*");
+            },
+            function(error) {
+                window.parent.postMessage("ERROR", "*");
+            }
+        );
+    </script>
+    """, height=0)
 
-# ───────────────────────────────
-# Connect to database and lookup customer
+    location_input = st.text_input("📍 Location (auto-filled from browser)", key="loc_input")
+    if not location_input or location_input == "ERROR":
+        st.warning("⚠️ Waiting for your device's location...")
+        st.stop()
+
+    try:
+        lat, lon = map(float, location_input.split(","))
+        st.session_state["location"] = (lat, lon)
+    except:
+        st.error("Invalid location format.")
+        st.stop()
+else:
+    lat, lon = st.session_state["location"]
+
+# 🔹 Step 3: Get site/customer based on GPS
 conn = get_connection()
 cursor = conn.cursor()
 
 customer = find_customer_from_location(lat, lon, conn)
 if not customer:
-    st.error("❌ You're not on a valid site.")
+    st.error("❌ You're not on a valid work site.")
     st.stop()
 
-st.subheader(f"🛠️ Site: {customer}")
+st.success(f"🛠️ Site Location: {customer}")
 
-# ───────────────────────────────
-# Get subcontractor from user param
-sub = None
-if user_param:
-    cursor.execute("SELECT SubContractor FROM SubContractorEmployees WHERE Employee = ?", user_param)
-    result = cursor.fetchone()
-    if result:
-        sub = result[0]
-
-if not sub:
-    st.error("Could not determine subcontractor from URL. Please contact admin.")
-    st.stop()
-else:
-    st.success(f"👷 Subcontractor: {sub}")
-
-# ───────────────────────────────
-# Check if user already exists by cookie
+# 🔹 Step 4: Identify or register employee by device cookie
 cursor.execute("SELECT * FROM SubContractorEmployees WHERE Cookies = ?", device_id)
 record = cursor.fetchone()
 
 if not record:
-    number = st.text_input("Enter your mobile number:")
+    number = st.text_input("📱 Enter your mobile number:")
     if number:
         cursor.execute("SELECT * FROM SubContractorEmployees WHERE Number = ?", number)
         existing = cursor.fetchone()
         if existing:
-            # Update with new cookie
             cursor.execute("UPDATE SubContractorEmployees SET Cookies = ? WHERE Number = ?", device_id, number)
             conn.commit()
+            st.success("✅ Device re-linked to existing user.")
         else:
-            # New user registration
-            name = st.text_input("Enter your name:")
+            name = st.text_input("🧑 Enter your name:")
             if name:
                 cursor.execute("""
                     INSERT INTO SubContractorEmployees (SubContractor, Employee, Number, Cookies)
                     VALUES (?, ?, ?, ?)
                 """, sub, name, number, device_id)
                 conn.commit()
-        st.success("✅ Cookie assigned. You may now clock in.")
+                st.success("✅ New user registered.")
+else:
+    st.info("✅ Recognized device. Welcome back!")
 
-# ───────────────────────────────
-# Clock In / Clock Out options
+# 🔹 Step 5: Clock In / Out
 action = st.radio("Select action:", ["Clock In", "Clock Out"])
 
 if st.button("Submit"):
     now = datetime.now()
     cursor.execute("SELECT Employee, Number FROM SubContractorEmployees WHERE Cookies = ?", device_id)
-    employee_record = cursor.fetchone()
+    user = cursor.fetchone()
 
-    if not employee_record:
-        st.error("Could not find your record. Please re-enter details.")
+    if not user:
+        st.error("⚠️ Could not verify user. Please re-enter mobile number.")
     else:
-        name, number = employee_record
+        name, number = user
         if action == "Clock In":
             cursor.execute("""
                 INSERT INTO TimeClock (SubContractor, Employee, Number, ClockIn, Lat, Lon, Cookie)
