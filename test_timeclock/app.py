@@ -26,7 +26,7 @@ st.markdown(f"👷 Subcontractor: {sub}")
 
 # ─────────────────────────────────────────────
 # 2. Location handling
-st.info("📍 Click the location button below to get started.")
+#st.info(" Click the location button below to get started.")
 
 # Get location using streamlit-geolocation
 location = streamlit_geolocation()
@@ -127,7 +127,7 @@ if location and location != "No Location Info":
             except Exception as e:
                 st.error(f"Database error: {str(e)}")
         else:
-            st.warning("Waiting patiently, for you to click the button above.")
+            st.warning("Waiting patiently, for you to click the icon 📍 above.")
     else:
         st.warning("Incomplete location data. Please try again.")
 else:
