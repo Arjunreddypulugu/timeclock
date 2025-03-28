@@ -1,5 +1,5 @@
 import streamlit as st
-import streamlit.components.v1 as components
+from streamlit_js_eval import streamlit_js_eval
 from datetime import datetime
 import uuid
 from db_config import get_connection
@@ -10,7 +10,7 @@ import pandas as pd
 st.set_page_config(page_title="Time Clock", layout="centered")
 st.title("🕒 Time Clock")
 
-# ─────────────────────────────────────
+# ─────────────────────────────
 # 1. Get subcontractor from URL
 query_params = st.query_params
 sub = query_params.get("sub")
@@ -22,61 +22,30 @@ if not sub:
 
 st.markdown(f"**👷 Subcontractor:** `{sub}`")
 
-# ─────────────────────────────────────
-# 2. Click-to-Fetch Location Button
-clicked = st.button("📍 Click to Get Current Location")
+# ─────────────────────────────
+# 2. Fetch location in the background
+location = streamlit_js_eval(js_expressions="navigator.geolocation.getCurrentPosition", key="get_user_location")
 
-if clicked:
-    components.html("""
-    <script>
-        navigator.geolocation.getCurrentPosition(
-            function(position) {
-                const coords = position.coords.latitude + "," + position.coords.longitude;
-                const input = window.parent.document.querySelector('input[data-testid="stTextInput"]');
-                if (input) {
-                    input.value = coords;
-                    input.dispatchEvent(new Event('input', { bubbles: true }));
-                }
-            },
-            function(error) {
-                const input = window.parent.document.querySelector('input[data-testid="stTextInput"]');
-                if (input) {
-                    input.value = "ERROR";
-                    input.dispatchEvent(new Event('input', { bubbles: true }));
-                }
-            }
-        );
-    </script>
-    """, height=0)
-
-    location_input = st.text_input("📍 Your GPS coordinates will appear here:", key="location_input")
-
-    if not location_input:
-        st.info("Waiting for your device to return coordinates...")
-        st.stop()
-    elif location_input == "ERROR":
-        st.error("❌ Could not fetch your location. Please allow GPS access.")
-        st.stop()
-    else:
-        try:
-            lat, lon = map(float, location_input.split(","))
-            st.success(f"📌 Coordinates: ({lat:.5f}, {lon:.5f})")
-            st.session_state["location"] = (lat, lon)
-
-            # Show user location on map
-            st.map(pd.DataFrame([{"lat": lat, "lon": lon}]))
-        except:
-            st.error("❌ Invalid location format.")
-            st.stop()
-else:
-    st.info("Click the button above to fetch your current location.")
+if not location:
+    st.warning("📍 Please allow browser location access (check browser popup).")
     st.stop()
 
-# ─────────────────────────────────────
-# 3. Look up customer from database bounding box
+# location will be a dict: {'coords': {'latitude': ..., 'longitude': ...}, ...}
+try:
+    lat = location['coords']['latitude']
+    lon = location['coords']['longitude']
+    st.session_state["location"] = (lat, lon)
+except:
+    st.error("❌ Failed to read GPS coordinates from browser.")
+    st.stop()
+
+# Optional: Show user location on map
+st.map(pd.DataFrame([{"lat": lat, "lon": lon}]))
+
+# ─────────────────────────────
+# 3. Match with customer site
 conn = get_connection()
 cursor = conn.cursor()
-lat, lon = st.session_state["location"]
 
 customer = find_customer_from_location(lat, lon, conn)
 
@@ -86,8 +55,8 @@ if not customer:
 else:
     st.success(f"🛠️ Work Site: {customer}")
 
-# ─────────────────────────────────────
-# 4. Check if device/user exists
+# ─────────────────────────────
+# 4. User verification
 cursor.execute("SELECT * FROM SubContractorEmployees WHERE Cookies = ?", device_id)
 record = cursor.fetchone()
 
@@ -112,7 +81,7 @@ if not record:
 else:
     st.info("✅ Device recognized. Welcome back!")
 
-# ─────────────────────────────────────
+# ─────────────────────────────
 # 5. Clock In / Clock Out
 action = st.radio("Select action:", ["Clock In", "Clock Out"])
 
