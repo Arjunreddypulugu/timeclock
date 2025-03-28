@@ -2,3 +2,4 @@ streamlit
 pyodbc
 geopy
 streamlit-js-eval
+streamlit-geolocation
