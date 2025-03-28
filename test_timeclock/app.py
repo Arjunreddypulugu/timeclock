@@ -1,20 +1,20 @@
 import streamlit as st
-from streamlit_js_eval import streamlit_js_eval
+import streamlit.components.v1 as components
 from datetime import datetime
 import uuid
 from db_config import get_connection
 from utils import find_customer_from_location
 import pyodbc
 import pandas as pd
+import time
 
 st.set_page_config(page_title="Time Clock", layout="centered")
 st.title("🕒 Time Clock")
 
-# ─────────────────────────────
 # 1. Get subcontractor from URL
 query_params = st.query_params
 sub = query_params.get("sub")
-device_id = str(uuid.uuid4())  # Simulated device ID
+device_id = str(uuid.uuid4())
 
 if not sub:
     st.error("Missing subcontractor in URL. Use ?sub=Alpha%20Electrical")
@@ -22,30 +22,58 @@ if not sub:
 
 st.markdown(f"**👷 Subcontractor:** `{sub}`")
 
-# ─────────────────────────────
-# 2. Fetch location in the background
-location = streamlit_js_eval(js_expressions="navigator.geolocation.getCurrentPosition", key="get_user_location")
+# 2. JS: Auto-request location on load and store in localStorage
+components.html("""
+<script>
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            const coords = position.coords.latitude + "," + position.coords.longitude;
+            localStorage.setItem("geo_location", coords);
+        },
+        function(error) {
+            localStorage.setItem("geo_location", "ERROR");
+        }
+    );
+</script>
+""", height=0)
 
-if not location:
-    st.warning("📍 Please allow browser location access (check browser popup).")
+# 3. Poll location from localStorage into hidden field
+components.html("""
+<script>
+    const coords = localStorage.getItem("geo_location");
+    if (coords) {
+        const input = window.parent.document.querySelector('input[data-testid="stTextInput"]');
+        if (input) {
+            input.value = coords;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    }
+</script>
+""", height=0)
+
+# 4. Hidden field to pipe location from JS to Python
+location_input = st.text_input("🔒", label_visibility="collapsed")
+
+if not location_input:
+    st.info("📍 Waiting for location... Check if browser asked for GPS access.")
     st.stop()
-
-# location will be a dict: {'coords': {'latitude': ..., 'longitude': ...}, ...}
-try:
-    lat = location['coords']['latitude']
-    lon = location['coords']['longitude']
-    st.session_state["location"] = (lat, lon)
-except:
-    st.error("❌ Failed to read GPS coordinates from browser.")
+elif location_input == "ERROR":
+    st.error("❌ Location denied. Please refresh and allow GPS.")
     st.stop()
+else:
+    try:
+        lat, lon = map(float, location_input.split(","))
+        st.session_state["location"] = (lat, lon)
+        st.success(f"📌 Coordinates: ({lat:.5f}, {lon:.5f})")
+        st.map(pd.DataFrame([{"lat": lat, "lon": lon}]))
+    except:
+        st.error("❌ Invalid location format.")
+        st.stop()
 
-# Optional: Show user location on map
-st.map(pd.DataFrame([{"lat": lat, "lon": lon}]))
-
-# ─────────────────────────────
-# 3. Match with customer site
+# 5. Lookup customer from location
 conn = get_connection()
 cursor = conn.cursor()
+lat, lon = st.session_state["location"]
 
 customer = find_customer_from_location(lat, lon, conn)
 
@@ -55,6 +83,8 @@ if not customer:
 else:
     st.success(f"🛠️ Work Site: {customer}")
 
+# 6. Rest of app (registration + clock-in/out remains same as previous version)
+# You can now safely re-use the remaining parts of app.py
 # ─────────────────────────────
 # 4. User verification
 cursor.execute("SELECT * FROM SubContractorEmployees WHERE Cookies = ?", device_id)
