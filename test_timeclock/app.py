@@ -15,10 +15,14 @@ components.html("""
 navigator.geolocation.getCurrentPosition(
     function(position) {
         const coords = position.coords.latitude + "," + position.coords.longitude;
-        window.parent.postMessage(coords, "*");
+        const url = new URL(window.location.href);
+        url.searchParams.set("location", coords);
+        window.location.href = url.toString();
     },
     function(error) {
-        window.parent.postMessage("ERROR", "*");
+        const url = new URL(window.location.href);
+        url.searchParams.set("location", "ERROR");
+        window.location.href = url.toString();
     }
 );
 </script>
