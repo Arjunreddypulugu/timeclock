@@ -9,61 +9,73 @@ import pyodbc
 st.set_page_config(page_title="Time Clock", layout="centered")
 st.title("🕒 Time Clock")
 
-# 🔹 Step 1: Get query parameters
+# 🔹 Get subcontractor from query params
 query_params = st.query_params
 sub = query_params.get("sub")
-device_id = str(uuid.uuid4())  # Simulated device ID for testing
+device_id = str(uuid.uuid4())  # Temporary device ID per session
 
-# 🔸 Error if no subcontractor provided
 if not sub:
     st.error("Missing subcontractor in URL. Use a valid link like '?sub=Alpha%20Electrical'")
     st.stop()
 
 st.markdown(f"**👷 Subcontractor:** `{sub}`")
 
-# 🔹 Step 2: JavaScript to fetch browser location and send it to Streamlit
+# 🔹 Capture and inject location from browser into text_input
 if "location" not in st.session_state:
-    components.html("""
-    <script>
-        navigator.geolocation.getCurrentPosition(
-            function(position) {
-                const coords = position.coords.latitude + "," + position.coords.longitude;
-                localStorage.setItem("geo_location", coords);
-                window.parent.postMessage(coords, "*");
-            },
-            function(error) {
-                window.parent.postMessage("ERROR", "*");
-            }
-        );
-    </script>
-    """, height=0)
+    st.session_state["location"] = None
 
-    location_input = st.text_input("📍 Location (auto-filled from browser)", key="loc_input")
-    if not location_input or location_input == "ERROR":
-        st.warning("⚠️ Waiting for your device's location...")
-        st.stop()
+components.html("""
+<script>
+navigator.geolocation.getCurrentPosition(
+    function(position) {
+        const coords = position.coords.latitude + "," + position.coords.longitude;
+        const input = window.parent.document.querySelector('input[data-testid="stTextInput"]');
+        if (input) {
+            input.value = coords;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    },
+    function(error) {
+        const input = window.parent.document.querySelector('input[data-testid="stTextInput"]');
+        if (input) {
+            input.value = "ERROR";
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    }
+);
+</script>
+""", height=0)
 
+location_input = st.text_input("📍 Location (auto-filled from browser)")
+
+if not location_input:
+    st.warning("⚠️ Waiting for your device's location...")
+    st.stop()
+elif location_input == "ERROR":
+    st.error("❌ Could not access your location. Please allow GPS or refresh.")
+    st.stop()
+else:
     try:
         lat, lon = map(float, location_input.split(","))
         st.session_state["location"] = (lat, lon)
+        st.success(f"📌 Location detected: ({lat:.4f}, {lon:.4f})")
     except:
-        st.error("Invalid location format.")
+        st.error("❌ Invalid location format.")
         st.stop()
-else:
-    lat, lon = st.session_state["location"]
 
-# 🔹 Step 3: Get site/customer based on GPS
+# 🔹 Check site match from location
 conn = get_connection()
 cursor = conn.cursor()
+lat, lon = st.session_state["location"]
 
 customer = find_customer_from_location(lat, lon, conn)
 if not customer:
     st.error("❌ You're not on a valid work site.")
     st.stop()
+else:
+    st.success(f"🛠️ Site: {customer}")
 
-st.success(f"🛠️ Site Location: {customer}")
-
-# 🔹 Step 4: Identify or register employee by device cookie
+# 🔹 Check if device already recognized
 cursor.execute("SELECT * FROM SubContractorEmployees WHERE Cookies = ?", device_id)
 record = cursor.fetchone()
 
@@ -75,7 +87,7 @@ if not record:
         if existing:
             cursor.execute("UPDATE SubContractorEmployees SET Cookies = ? WHERE Number = ?", device_id, number)
             conn.commit()
-            st.success("✅ Device re-linked to existing user.")
+            st.success("✅ Device linked to existing user.")
         else:
             name = st.text_input("🧑 Enter your name:")
             if name:
@@ -86,9 +98,9 @@ if not record:
                 conn.commit()
                 st.success("✅ New user registered.")
 else:
-    st.info("✅ Recognized device. Welcome back!")
+    st.info("✅ Device recognized. Welcome back!")
 
-# 🔹 Step 5: Clock In / Out
+# 🔹 Clock In / Clock Out options
 action = st.radio("Select action:", ["Clock In", "Clock Out"])
 
 if st.button("Submit"):
