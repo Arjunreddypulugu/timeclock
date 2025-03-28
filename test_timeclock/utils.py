@@ -4,7 +4,8 @@ def find_customer_from_location(lat, lon, conn):
         SELECT CustomerName, MinLat, MaxLat, MinLon, MaxLon
         FROM LocationCustomerMapping
     """)
-    for row in cursor.fetchall():
+    rows = cursor.fetchall()
+    for row in rows:
         if row.MinLat <= lat <= row.MaxLat and row.MinLon <= lon <= row.MaxLon:
             return row.CustomerName
     return None
