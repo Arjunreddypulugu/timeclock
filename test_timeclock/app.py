@@ -1,5 +1,5 @@
 import streamlit as st
-import streamlit.components.v1 as components
+from streamlit_geolocation import geolocation
 from datetime import datetime
 import uuid
 from db_config import get_connection
@@ -10,7 +10,7 @@ import pandas as pd
 st.set_page_config(page_title="Time Clock", layout="centered")
 st.title("🕒 Time Clock")
 
-# ─────────────────────────────────────────────
+# ─────────────────────────────────────
 # 1. Subcontractor from URL
 query_params = st.query_params
 sub = query_params.get("sub")
@@ -22,70 +22,36 @@ if not sub:
 
 st.markdown(f"**👷 Subcontractor:** `{sub}`")
 
-# ─────────────────────────────────────────────
-# 2. User must click to allow location access
-clicked = st.button("📍 Click to Fetch Location")
+# ─────────────────────────────────────
+# 2. Get user location using streamlit-geolocation
+location = geolocation("📍 Click to Fetch Location", key="get_location")
 
-if clicked:
-    components.html("""
-    <script>
-        navigator.geolocation.getCurrentPosition(
-            function(position) {
-                const coords = position.coords.latitude + "," + position.coords.longitude;
-                localStorage.setItem("geo_location", coords);
-                const input = window.parent.document.querySelector('input[data-testid="stTextInput"]');
-                if (input) {
-                    input.value = coords;
-                    input.dispatchEvent(new Event('input', { bubbles: true }));
-                }
-            },
-            function(error) {
-                const input = window.parent.document.querySelector('input[data-testid="stTextInput"]');
-                if (input) {
-                    input.value = "ERROR";
-                    input.dispatchEvent(new Event('input', { bubbles: true }));
-                }
-            }
-        );
-    </script>
-    """, height=0)
-
-    # Hidden input to receive coordinates from JS
-    location_input = st.text_input("🔒", label_visibility="collapsed")
-
-    if not location_input:
-        st.info("⏳ Waiting for location…")
-        st.stop()
-    elif location_input == "ERROR":
-        st.error("❌ Location access denied. Please allow location.")
-        st.stop()
-    else:
-        try:
-            lat, lon = map(float, location_input.split(","))
-            st.session_state["location"] = (lat, lon)
-            st.success(f"📌 Coordinates: ({lat:.5f}, {lon:.5f})")
-            st.map(pd.DataFrame([{"lat": lat, "lon": lon}]))
-        except:
-            st.error("❌ Invalid location format.")
-            st.stop()
-else:
+if location is None or location.get("latitude") is None:
+    st.info("📡 Waiting for location… Please click the button and allow browser access.")
     st.stop()
 
-# ─────────────────────────────────────────────
-# 3. Customer match
+lat = location["latitude"]
+lon = location["longitude"]
+st.session_state["location"] = (lat, lon)
+
+st.success(f"📌 Coordinates: ({lat:.5f}, {lon:.5f})")
+st.map(pd.DataFrame([{"lat": lat, "lon": lon}]))
+
+# ─────────────────────────────────────
+# 3. Find matching customer from bounding box
 conn = get_connection()
 cursor = conn.cursor()
-lat, lon = st.session_state["location"]
 
 customer = find_customer_from_location(lat, lon, conn)
+
 if not customer:
-    st.error("❌ Not a valid job site.")
+    st.error("❌ You are not on a valid job site.")
     st.stop()
 else:
     st.success(f"🛠️ Work Site: {customer}")
 
-# ─────────────────────────────────────────────
-# 4. Registration (same as before)
+# ─────────────────────────────────────
+# 4. Check or register employee by device ID
 cursor.execute("SELECT * FROM SubContractorEmployees WHERE Cookies = ?", device_id)
 record = cursor.fetchone()
 
@@ -97,7 +63,7 @@ if not record:
         if existing:
             cursor.execute("UPDATE SubContractorEmployees SET Cookies = ? WHERE Number = ?", device_id, number)
             conn.commit()
-            st.success("✅ Device linked.")
+            st.success("✅ Device linked to existing user.")
         else:
             name = st.text_input("🧑 Enter your name:")
             if name:
@@ -106,12 +72,12 @@ if not record:
                     VALUES (?, ?, ?, ?)
                 """, sub, name, number, device_id)
                 conn.commit()
-                st.success("✅ Registered successfully.")
+                st.success("✅ New user registered.")
 else:
-    st.info("✅ Device recognized.")
+    st.info("✅ Device recognized. Welcome back!")
 
-# ─────────────────────────────────────────────
-# 5. Clock In / Out
+# ─────────────────────────────────────
+# 5. Clock In / Clock Out
 action = st.radio("Select action:", ["Clock In", "Clock Out"])
 
 if st.button("Submit", key="submit_btn"):
@@ -120,7 +86,7 @@ if st.button("Submit", key="submit_btn"):
     user = cursor.fetchone()
 
     if not user:
-        st.error("⚠️ Could not verify user.")
+        st.error("⚠️ Could not verify user. Please re-enter mobile number.")
     else:
         name, number = user
         if action == "Clock In":
