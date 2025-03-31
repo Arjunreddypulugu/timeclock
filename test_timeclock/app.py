@@ -12,20 +12,67 @@ import urllib.parse
 # Initialize cookie controller
 cookies = CookieController()
 
-st.set_page_config(page_title="Time Clock", layout="centered", page_icon="⏰")
-st.title("🕒 Time Clock")
+# Improved page configuration with custom theme
+st.set_page_config(
+    page_title="Time Clock",
+    page_icon="⏰",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
+
+# Custom CSS for better styling
+st.markdown("""
+<style>
+    .main-header {
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+    .subcontractor {
+        font-size: 1.2rem;
+        margin-bottom: 1.5rem;
+        text-align: center;
+    }
+    .status-box {
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin: 1rem 0;
+        text-align: center;
+    }
+    .clock-btn {
+        width: 100%;
+        padding: 0.75rem !important;
+        font-size: 1.2rem !important;
+        margin: 1rem 0 !important;
+    }
+    .info-section {
+        background-color: rgba(240, 242, 246, 0.1);
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin: 1rem 0;
+    }
+    .stButton button {
+        width: 100%;
+    }
+    .map-container {
+        margin: 1rem 0;
+        border-radius: 0.5rem;
+        overflow: hidden;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# App header with more visual appeal
+st.markdown('<div class="main-header">🕒 Time Clock</div>', unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
 # 1. Device identification using cookies
 stored_device_id = cookies.get("device_id")  
 
 if not stored_device_id:
-    # No cookie found, generate a new device ID
     device_id = str(uuid.uuid4())
-    # Set cookie - using correct parameter syntax
     cookies.set("device_id", device_id)
 else:
-    # Use existing device ID from cookie
     device_id = stored_device_id
 
 # ─────────────────────────────────────────────
@@ -38,14 +85,14 @@ if not encoded_sub:
     st.stop()
 
 try:
-    # URL decode then base64 decode
     decoded_bytes = base64.b64decode(urllib.parse.unquote(encoded_sub))
     sub = decoded_bytes.decode('utf-8')
 except Exception as e:
     st.error(f"Invalid subcontractor code. Error: {str(e)}")
     st.stop()
 
-st.markdown(f"👷 Subcontractor: {sub}")
+# Show subcontractor with nicer styling
+st.markdown(f'<div class="subcontractor">👷 Subcontractor: <strong>{sub}</strong></div>', unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
 # 3. Check if user is already registered
@@ -61,7 +108,8 @@ try:
         st.session_state["user_name"] = user_data[0]
         st.session_state["user_number"] = user_data[1]
         
-        st.success(f"✅ Welcome back, {st.session_state['user_name']}!")
+        # More eye-catching welcome message
+        st.markdown(f'<div class="status-box" style="background-color: rgba(45, 183, 66, 0.2);">✅ Welcome back, <strong>{st.session_state["user_name"]}</strong>!</div>', unsafe_allow_html=True)
         
         # Check if already clocked in
         cursor = conn.cursor()
@@ -73,7 +121,8 @@ try:
         cursor.close()
         
         if active_session:
-            st.info(f"⏱️ You are currently clocked in since {active_session[0]}")
+            # More visible clock-in status
+            st.markdown(f'<div class="status-box" style="background-color: rgba(54, 137, 214, 0.2);">⏱️ You are currently clocked in since <strong>{active_session[0]}</strong></div>', unsafe_allow_html=True)
             st.session_state["clocked_in"] = True
         else:
             st.session_state["clocked_in"] = False
@@ -85,11 +134,18 @@ except Exception as e:
 
 # ─────────────────────────────────────────────
 # 4. Location handling
-#if st.button("📍 Click to Fetch Location", type="primary"):
 st.session_state["fetch_location"] = True
 
 if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
-    location = streamlit_geolocation()
+    # Create two columns for better layout
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        location = streamlit_geolocation()
+    
+    with col2:
+        # Show a little help text
+        st.info("📱 Allow location access when prompted")
 
     if location and location != "No Location Info":
         if isinstance(location, dict) and 'latitude' in location and 'longitude' in location:
@@ -97,10 +153,16 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
             lon = location['longitude']
 
             if lat is not None and lon is not None:
-                # Display coordinates and map
-                st.success(f"📌 Coordinates: {lat}, {lon}")
+                # Hide coordinates in an expander to reduce clutter
+                with st.expander("📌 View Location Details"):
+                    st.write(f"Latitude: {lat}")
+                    st.write(f"Longitude: {lon}")
+                
+                # Display map with better styling
+                st.markdown('<div class="map-container">', unsafe_allow_html=True)
                 map_df = pd.DataFrame([{"lat": lat, "lon": lon}])
                 st.map(map_df)
+                st.markdown('</div>', unsafe_allow_html=True)
 
                 # ─────────────────────────────────────────────
                 # 5. Customer match
@@ -122,7 +184,8 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
                         st.error("❌ Not a valid job site.")
                         st.stop()
                     
-                    st.success(f"🛠️ Work Site: {customer}")
+                    # More visible work site information
+                    st.markdown(f'<div class="status-box" style="background-color: rgba(45, 183, 66, 0.2);">🛠️ Work Site: <strong>{customer}</strong></div>', unsafe_allow_html=True)
 
                     # ─────────────────────────────────────────────
                     # 6. User registration or clock in/out
@@ -130,7 +193,7 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
                         # User is already registered - show clock in/out options
                         if st.session_state.get("clocked_in", False):
                             # User is already clocked in - offer clock out
-                            if st.button("🚪 Clock Out"):
+                            if st.button("🚪 Clock Out", type="primary", key="clock_out_btn", help="Click to record your clock out time"):
                                 now = datetime.now()
                                 cursor = conn.cursor()
                                 cursor.execute("""
@@ -139,11 +202,12 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
                                 """, now, device_id)
                                 conn.commit()
                                 cursor.close()
+                                st.balloons()  # Add visual celebration
                                 st.success(f"👋 Clocked out at {now.strftime('%H:%M:%S')}")
                                 st.session_state["clocked_in"] = False
                         else:
                             # User is registered but not clocked in - offer clock in
-                            if st.button("⏱️ Clock In"):
+                            if st.button("⏱️ Clock In", type="primary", key="clock_in_btn", help="Click to start tracking time"):
                                 now = datetime.now()
                                 cursor = conn.cursor()
                                 cursor.execute("""
@@ -153,12 +217,18 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
                                    now, lat_float, lon_float, device_id)
                                 conn.commit()
                                 cursor.close()
+                                st.balloons()  # Add visual celebration
                                 st.success(f"✅ Clocked in at {now.strftime('%H:%M:%S')}")
                                 st.session_state["clocked_in"] = True
                     else:
-                        # New user registration
+                        # New user registration - improved layout with columns
+                        st.markdown('<div class="info-section">', unsafe_allow_html=True)
                         st.subheader("📝 New User Registration")
-                        number = st.text_input("📱 Enter your mobile number:")
+                        
+                        # Instructions for new users
+                        st.info("Please register to begin tracking your time at this job site.")
+                        
+                        number = st.text_input("📱 Enter your mobile number:", help="Enter your contact number")
                         
                         if number:
                             # Check if number exists but on a different device
@@ -169,51 +239,6 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
                             
                             if existing:
                                 # User exists but on different device
-                                if st.button("🔄 Link this device to your account"):
+                                st.warning("This number is already registered. Link this device to your existing account.")
+                                if st.button("🔄 Link Device to Account", type="primary", help="Connect this device to your existing account"):
                                     cursor = conn.cursor()
-                                    cursor.execute("UPDATE SubContractorEmployees SET Cookies = ? WHERE Number = ?", device_id, number)
-                                    conn.commit()
-                                    cursor.close()
-                                    st.success("✅ Device linked. You can now clock in/out.")
-                                    st.rerun()
-                            else:
-                                # New user registration
-                                name = st.text_input("🧑 Enter your name:")
-                                if name:
-                                    if st.button("✅ Register & Clock In"):
-                                        now = datetime.now()
-                                        
-                                        # Register user
-                                        cursor = conn.cursor()
-                                        cursor.execute("""
-                                            INSERT INTO SubContractorEmployees (SubContractor, Employee, Number, Cookies)
-                                            VALUES (?, ?, ?, ?)
-                                        """, sub, name, number, device_id)
-                                        conn.commit()
-                                        cursor.close()
-                                        
-                                        # Clock in
-                                        cursor = conn.cursor()
-                                        cursor.execute("""
-                                            INSERT INTO TimeClock (SubContractor, Employee, Number, ClockIn, Lat, Lon, Cookie)
-                                            VALUES (?, ?, ?, ?, ?, ?, ?)
-                                        """, sub, name, number, now, lat_float, lon_float, device_id)
-                                        conn.commit()
-                                        cursor.close()
-                                        
-                                        st.success(f"✅ Registered and clocked in at {now.strftime('%H:%M:%S')}")
-                                        st.session_state["registered"] = True
-                                        st.session_state["user_name"] = name
-                                        st.session_state["user_number"] = number
-                                        st.session_state["clocked_in"] = True
-
-                except Exception as e:
-                    st.error(f"Database error: {str(e)}")
-            else:
-                st.warning("📍 Please click on the location icon above to get started.")
-        else:
-            st.warning("Incomplete location data. Please try again.")
-    else:
-        st.info("⏳ Waiting for location...")
-else:
-    st.info("⌛ Click the location button above to get started.")
