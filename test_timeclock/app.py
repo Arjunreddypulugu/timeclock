@@ -8,6 +8,7 @@ from streamlit_geolocation import streamlit_geolocation
 from streamlit_cookies_controller import CookieController
 import base64
 import urllib.parse
+from streamlit_geolocation import get_geolocation
 
 # Initialize cookie controller
 cookies = CookieController()
@@ -153,17 +154,16 @@ except Exception as e:
 
 # ─────────────────────────────────────────────
 # 4. Location handling
-#if st.button("📍 Click to Fetch Location", type="primary"):
-st.session_state["fetch_location"] = True
-
-if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
-    location = streamlit_geolocation()
-
-    if location and location != "No Location Info":
-        if isinstance(location, dict) and 'latitude' in location and 'longitude' in location:
-            lat = location['latitude']
-            lon = location['longitude']
-
+if st.button("📍 Click to Fetch Location", type="primary"):
+    with st.spinner("Fetching your location..."):
+        # Direct call to get location without displaying the secondary button
+        location_data = get_geolocation()
+        
+        if location_data and "coords" in location_data:
+            coords = location_data["coords"]
+            lat = coords.get("latitude")
+            lon = coords.get("longitude")
+            
             if lat is not None and lon is not None:
                 # Display coordinates and map with better visibility
                 st.markdown(f'<div class="centered-container"><div class="info-card">📌 Your Location: {lat}, {lon}</div></div>', unsafe_allow_html=True)
@@ -192,7 +192,17 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
                     
                     # Display work site with better visibility
                     st.markdown(f'<div class="centered-container"><div class="info-card">🛠️ Work Site: {customer}</div></div>', unsafe_allow_html=True)
-
+                    
+                    # Rest of your code for registration and clock in/out...
+                    
+                except Exception as e:
+                    st.error(f"Database error: {str(e)}")
+            else:
+                st.error("Could not retrieve precise location. Please try again or check your browser permissions.")
+        else:
+            st.error("Location access denied or unavailable. Please allow location access and try again.")
+else:
+    st.info("👆 Click the button above to get started")
                     # ─────────────────────────────────────────────
                     # 6. User registration or clock in/out
                     if st.session_state.get("registered", False):
