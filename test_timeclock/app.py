@@ -7,55 +7,37 @@ from utils import find_customer_from_location
 from streamlit_geolocation import streamlit_geolocation
 import streamlit.components.v1 as components
 
-st.set_page_config(page_title="Time Clock", layout="centered")
+st.set_page_config(page_title="Time Clock", layout="centered", page_icon="⏰")
 st.title("🕒 Time Clock")
 
 # ─────────────────────────────────────────────
-# 1. Get device ID from localStorage (persistence across sessions)
-# Create a placeholder for device ID
-if "device_id" not in st.session_state:
-    st.session_state["device_id"] = str(uuid.uuid4())  # Temporary ID
-
-# Get persistent device ID from localStorage
-# Using a regular string instead of f-string to avoid parsing issues
-device_id_js = """
-<script>
-    // Check if device ID exists in localStorage
-    const storedDeviceId = localStorage.getItem('timeClockDeviceId');
-    
-    if (storedDeviceId) {
-        // Use existing ID - send it to Streamlit
-        window.parent.postMessage(
-            {type: 'streamlit:setComponentValue', value: storedDeviceId}, '*'
-        );
-    } else {
-        // No stored ID - store the temporary one
-        const serverDeviceId = "DEVICE_ID_PLACEHOLDER";
-        // Store new ID in localStorage for future visits
-        localStorage.setItem('timeClockDeviceId', serverDeviceId);
-        // Send confirmation back to Streamlit
-        window.parent.postMessage(
-            {type: 'streamlit:setComponentValue', value: serverDeviceId}, '*'
-        );
-    }
-</script>
-"""
-
-# Replace placeholder with actual device ID
-device_id_js = device_id_js.replace("DEVICE_ID_PLACEHOLDER", st.session_state["device_id"])
-
-components.html(device_id_js, height=0, width=0, key="device_id_component")
-
-# Receive the device ID from the component
-if "device_id_component" in st.session_state:
-    st.session_state["device_id"] = st.session_state["device_id_component"]
-
-device_id = st.session_state["device_id"]
-
-# ─────────────────────────────────────────────
-# 2. Subcontractor from URL
+# 1. Subcontractor from URL
 query_params = st.query_params
 sub = query_params.get("sub")
+
+# Initialize device ID using session state
+if "device_id" not in st.session_state:
+    st.session_state["device_id"] = str(uuid.uuid4())
+device_id = st.session_state["device_id"]
+
+# Store device ID in browser's localStorage for persistence across sessions
+components.html(
+    f"""
+    <script>
+    (function() {{
+        // Check if device ID exists in localStorage
+        const storedDeviceId = localStorage.getItem('timeClockDeviceId');
+        
+        if (!storedDeviceId) {{
+            // Store the current device ID
+            localStorage.setItem('timeClockDeviceId', '{device_id}');
+        }}
+    }})();
+    </script>
+    """, 
+    height=0, 
+    width=0
+)
 
 if not sub:
     st.error("Missing subcontractor in URL. Use ?sub=Alpha%20Electrical")
@@ -64,11 +46,7 @@ if not sub:
 st.markdown(f"👷 Subcontractor: {sub}")
 
 # ─────────────────────────────────────────────
-# 3. Check if user is already registered (before location)
-already_registered = False
-user_name = None
-user_number = None
-
+# 2. Check if user is already registered
 try:
     conn = get_connection()
     cursor = conn.cursor()
@@ -77,9 +55,11 @@ try:
     cursor.close()
     
     if user_data:
-        already_registered = True
-        user_name, user_number = user_data
-        st.success(f"✅ Welcome back, {user_name}!")
+        st.session_state["registered"] = True
+        st.session_state["user_name"] = user_data[0]
+        st.session_state["user_number"] = user_data[1]
+        
+        st.success(f"✅ Welcome back, {st.session_state['user_name']}!")
         
         # Check if already clocked in
         cursor = conn.cursor()
@@ -92,14 +72,21 @@ try:
         
         if active_session:
             st.info(f"⏱️ You are currently clocked in since {active_session[0]}")
+            st.session_state["clocked_in"] = True
+        else:
+            st.session_state["clocked_in"] = False
+    else:
+        st.session_state["registered"] = False
 except Exception as e:
     st.error(f"Database connection error: {str(e)}")
+    st.session_state["registered"] = False
 
 # ─────────────────────────────────────────────
-# 4. Location handling
-location_button = st.button("📍 Click to Fetch Location", key="fetch_location")
+# 3. Location handling
+if st.button("📍 Click to Fetch Location", type="primary"):
+    st.session_state["fetch_location"] = True
 
-if location_button:
+if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
     # Get location using streamlit-geolocation
     location = streamlit_geolocation()
 
@@ -115,7 +102,7 @@ if location_button:
                 st.map(map_df)
 
                 # ─────────────────────────────────────────────
-                # 5. Customer match with robust cursor management
+                # 4. Customer match with robust cursor management
                 try:
                     conn = get_connection()
                     
@@ -138,20 +125,12 @@ if location_button:
                     st.success(f"🛠️ Work Site: {customer}")
 
                     # ─────────────────────────────────────────────
-                    # 6. User registration or clock in/out
-                    if already_registered:
+                    # 5. User registration or clock in/out
+                    if st.session_state.get("registered", False):
                         # User is already registered - show clock in/out options
-                        cursor = conn.cursor()
-                        cursor.execute("""
-                            SELECT ClockIn FROM TimeClock 
-                            WHERE Cookie = ? AND ClockOut IS NULL
-                        """, device_id)
-                        active_session = cursor.fetchone()
-                        cursor.close()
-                        
-                        if active_session:
+                        if st.session_state.get("clocked_in", False):
                             # User is already clocked in - offer clock out
-                            if st.button("🚪 Clock Out", type="primary"):
+                            if st.button("🚪 Clock Out"):
                                 now = datetime.now()
                                 cursor = conn.cursor()
                                 cursor.execute("""
@@ -161,18 +140,21 @@ if location_button:
                                 conn.commit()
                                 cursor.close()
                                 st.success(f"👋 Clocked out at {now.strftime('%H:%M:%S')}")
+                                st.session_state["clocked_in"] = False
                         else:
                             # User is registered but not clocked in - offer clock in
-                            if st.button("⏱️ Clock In", type="primary"):
+                            if st.button("⏱️ Clock In"):
                                 now = datetime.now()
                                 cursor = conn.cursor()
                                 cursor.execute("""
                                     INSERT INTO TimeClock (SubContractor, Employee, Number, ClockIn, Lat, Lon, Cookie)
                                     VALUES (?, ?, ?, ?, ?, ?, ?)
-                                """, sub, user_name, user_number, now, lat_float, lon_float, device_id)
+                                """, sub, st.session_state["user_name"], st.session_state["user_number"], 
+                                   now, lat_float, lon_float, device_id)
                                 conn.commit()
                                 cursor.close()
                                 st.success(f"✅ Clocked in at {now.strftime('%H:%M:%S')}")
+                                st.session_state["clocked_in"] = True
                     else:
                         # New user registration
                         st.subheader("📝 New User Registration")
@@ -198,7 +180,7 @@ if location_button:
                                 # New user registration
                                 name = st.text_input("🧑 Enter your name:")
                                 if name:
-                                    if st.button("✅ Register & Clock In", type="primary"):
+                                    if st.button("✅ Register & Clock In"):
                                         now = datetime.now()
                                         
                                         # Register user
@@ -220,6 +202,10 @@ if location_button:
                                         cursor.close()
                                         
                                         st.success(f"✅ Registered and clocked in at {now.strftime('%H:%M:%S')}")
+                                        st.session_state["registered"] = True
+                                        st.session_state["user_name"] = name
+                                        st.session_state["user_number"] = number
+                                        st.session_state["clocked_in"] = True
 
                 except Exception as e:
                     st.error(f"Database error: {str(e)}")
