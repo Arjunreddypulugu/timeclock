@@ -334,9 +334,11 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
                 except Exception as e:
                     st.error(f"Database error: {str(e)}")
             else:
-                st.warning("Incomplete location data. Please try again.")
+                st.warning('Waiting Patiently')
         else:
-            st.info("⏳ Waiting for location... Please click the location icon that appears")
+            st.warning("Incomplete location data. Please try again.")
+    else:
+        st.info("⏳ Waiting for location... Please click the location icon that appears")
 # If user has already fetched location (stored in session state), display it again
 elif "lat" in st.session_state and "lon" in st.session_state:
     # Use stored location data
