@@ -334,7 +334,7 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
                 except Exception as e:
                     st.error(f"Database error: {str(e)}")
             else:
-                st.warning("📍 Please click on the location icon above to get started.")
+                st.warning(" ")
         else:
             st.warning("Incomplete location data. Please try again.")
     else:
