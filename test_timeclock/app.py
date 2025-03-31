@@ -5,6 +5,7 @@ import pandas as pd
 from db_config import get_connection
 from utils import find_customer_from_location
 from streamlit_geolocation import streamlit_geolocation
+import json
 
 st.set_page_config(page_title="Time Clock", layout="centered")
 st.title("🕒 Time Clock")
@@ -14,8 +15,48 @@ st.title("🕒 Time Clock")
 query_params = st.query_params
 sub = query_params.get("sub")
 
+# Better device identification using Local Storage
+# This persists even when browser is closed
 if "device_id" not in st.session_state:
-    st.session_state["device_id"] = str(uuid.uuid4())
+    # Use browser's local storage to check for existing device ID
+    device_check = st.empty()
+    device_check.html("""
+    <script>
+    const storedDeviceId = localStorage.getItem('timeClockDeviceId');
+    if (storedDeviceId) {
+        window.parent.postMessage({type: 'device_id', value: storedDeviceId}, '*');
+    } else {
+        const newDeviceId = crypto.randomUUID();
+        localStorage.setItem('timeClockDeviceId', newDeviceId);
+        window.parent.postMessage({type: 'device_id', value: newDeviceId}, '*');
+    }
+    </script>
+    """, height=0)
+    
+    # Create a placeholder for device ID
+    st.session_state["device_id"] = str(uuid.uuid4())  # Temporary ID until browser provides one
+
+# JavaScript message handler to receive the device ID from browser storage
+components_js = """
+<script>
+window.addEventListener('message', function(event) {
+    if (event.data.type === 'device_id') {
+        const input = window.parent.document.querySelector('input[data-testid="stTextInput"]');
+        if (input) {
+            input.value = event.data.value;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    }
+});
+</script>
+"""
+st.components.v1.html(components_js, height=0)
+
+# Hidden field to receive device ID from JavaScript
+device_id_input = st.text_input("Device ID", key="device_id_input", label_visibility="collapsed")
+if device_id_input and device_id_input != st.session_state["device_id"]:
+    st.session_state["device_id"] = device_id_input
+
 device_id = st.session_state["device_id"]
 
 if not sub:
@@ -26,7 +67,6 @@ st.markdown(f"👷 Subcontractor: {sub}")
 
 # ─────────────────────────────────────────────
 # 2. Location handling
-#st.info("📍 Click the location button below to get started.")
 
 # Get location using streamlit-geolocation
 location = streamlit_geolocation()
@@ -43,92 +83,50 @@ if location and location != "No Location Info":
             st.map(map_df)
 
             # ─────────────────────────────────────────────
-            # 3. Customer match with robust cursor management
+            # 3. Check if device is already registered to someone else
             try:
                 conn = get_connection()
                 cursor = conn.cursor()
-
-                # Convert location to float to prevent comparison errors
-                try:
+                
+                # First, check if this device is already associated with a user
+                cursor.execute("SELECT Employee, Number FROM SubContractorEmployees WHERE Cookies = ?", device_id)
+                existing_user = cursor.fetchone()
+                cursor.close()
+                
+                if existing_user:
+                    # Device is already registered to a user
+                    employee_name, employee_number = existing_user
+                    st.info(f"📱 This device is registered to: {employee_name}")
+                    
+                    # Get location-based customer
+                    cursor = conn.cursor()
                     lat_float = float(lat)
                     lon_float = float(lon)
-                    
-                    # Ensure previous result sets are consumed before executing new queries
                     customer = find_customer_from_location(lat_float, lon_float, conn)
-                    cursor.close()  # Close the cursor after use
-                    
-                except (TypeError, ValueError) as e:
-                    st.error(f"Invalid location format: {str(e)}")
-                    st.stop()
-
-                if not customer:
-                    st.error("❌ Not a valid job site.")
-                    st.stop()
-                else:
-                    st.success(f"🛠️ Work Site: {customer}")
-
-                # ─────────────────────────────────────────────
-                # 4. Registration with proper cursor handling
-                cursor = conn.cursor()  # Reopen a new cursor for registration queries
-                cursor.execute("SELECT * FROM SubContractorEmployees WHERE Cookies = ?", device_id)
-                record = cursor.fetchone()
-                cursor.close()  # Close the cursor after fetching
-
-                if not record:
-                    number = st.text_input("📱 Enter your mobile number:")
-                    if number:
-                        cursor = conn.cursor()  # Open a new cursor for subsequent queries
-                        cursor.execute("SELECT * FROM SubContractorEmployees WHERE Number = ?", number)
-                        existing = cursor.fetchone()
-                        cursor.close()  # Close the cursor after fetching
-
-                        if existing:
-                            cursor = conn.cursor()
-                            cursor.execute("UPDATE SubContractorEmployees SET Cookies = ? WHERE Number = ?", device_id, number)
-                            conn.commit()
-                            cursor.close()
-                            st.success("✅ Device linked.")
-                        else:
-                            name = st.text_input("🧑 Enter your name:")
-                            if name:
-                                cursor = conn.cursor()
-                                cursor.execute("""
-                                    INSERT INTO SubContractorEmployees (SubContractor, Employee, Number, Cookies)
-                                    VALUES (?, ?, ?, ?)
-                                """, sub, name, number, device_id)
-                                conn.commit()
-                                cursor.close()
-                                st.success("✅ Registered successfully.")
-                else:
-                    st.info("✅ Device recognized.")
-
-                # ─────────────────────────────────────────────
-                # 5. Clock In / Out with proper result set handling
-                action = st.radio("Select action:", ["Clock In", "Clock Out"])
-
-                if st.button("Submit", key="submit_btn"):
-                    now = datetime.now()
-                    
-                    cursor = conn.cursor()  # Open a new cursor for clock-in/out queries
-                    cursor.execute("SELECT Employee, Number FROM SubContractorEmployees WHERE Cookies = ?", device_id)
-                    user = cursor.fetchone()
                     cursor.close()
-
-                    if not user:
-                        st.error("⚠️ Could not verify user.")
-                    else:
-                        name, number = user
-
-                        if action == "Clock In":
-                            cursor = conn.cursor()
-                            cursor.execute("""
-                                INSERT INTO TimeClock (SubContractor, Employee, Number, ClockIn, Lat, Lon, Cookie)
-                                VALUES (?, ?, ?, ?, ?, ?, ?)
-                            """, sub, name, number, now, lat_float, lon_float, device_id)
-                            conn.commit()
-                            cursor.close()
-                            st.success(f"✅ Clocked in at {now.strftime('%H:%M:%S')}")
-                        elif action == "Clock Out":
+                    
+                    if not customer:
+                        st.error("❌ Not a valid job site.")
+                        st.stop()
+                    
+                    st.success(f"🛠️ Work Site: {customer}")
+                    
+                    # Check if already clocked in
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        SELECT ClockIn FROM TimeClock 
+                        WHERE Cookie = ? AND ClockOut IS NULL
+                    """, device_id)
+                    current_session = cursor.fetchone()
+                    cursor.close()
+                    
+                    if current_session:
+                        # User is already clocked in
+                        clock_in_time = current_session[0]
+                        st.warning(f"⏰ You are currently clocked in since {clock_in_time}")
+                        
+                        if st.button("⏱️ Clock Out Now"):
+                            now = datetime.now()
                             cursor = conn.cursor()
                             cursor.execute("""
                                 UPDATE TimeClock SET ClockOut = ?
@@ -137,7 +135,74 @@ if location and location != "No Location Info":
                             conn.commit()
                             cursor.close()
                             st.success(f"👋 Clocked out at {now.strftime('%H:%M:%S')}")
-
+                    else:
+                        # User is not clocked in
+                        if st.button("⏱️ Clock In Now"):
+                            now = datetime.now()
+                            cursor = conn.cursor()
+                            cursor.execute("""
+                                INSERT INTO TimeClock (SubContractor, Employee, Number, ClockIn, Lat, Lon, Cookie)
+                                VALUES (?, ?, ?, ?, ?, ?, ?)
+                            """, sub, employee_name, employee_number, now, lat_float, lon_float, device_id)
+                            conn.commit()
+                            cursor.close()
+                            st.success(f"✅ Clocked in at {now.strftime('%H:%M:%S')}")
+                
+                else:
+                    # New registration flow
+                    number = st.text_input("📱 Enter your mobile number:")
+                    
+                    if number:
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT * FROM SubContractorEmployees WHERE Number = ?", number)
+                        existing = cursor.fetchone()
+                        cursor.close()
+                        
+                        if existing:
+                            # User exists but using a new device
+                            if st.button("Link this device to your account"):
+                                cursor = conn.cursor()
+                                cursor.execute("UPDATE SubContractorEmployees SET Cookies = ? WHERE Number = ?", device_id, number)
+                                conn.commit()
+                                cursor.close()
+                                st.success("✅ Device linked. Refresh the page to continue.")
+                        else:
+                            # Completely new user
+                            name = st.text_input("🧑 Enter your name:")
+                            if name:
+                                # Check if device is already registered
+                                lat_float = float(lat)
+                                lon_float = float(lon)
+                                customer = find_customer_from_location(lat_float, lon_float, conn)
+                                
+                                if not customer:
+                                    st.error("❌ Not a valid job site.")
+                                    st.stop()
+                                
+                                st.success(f"🛠️ Work Site: {customer}")
+                                
+                                if st.button("Register & Clock In"):
+                                    now = datetime.now()
+                                    
+                                    # Register user
+                                    cursor = conn.cursor()
+                                    cursor.execute("""
+                                        INSERT INTO SubContractorEmployees (SubContractor, Employee, Number, Cookies)
+                                        VALUES (?, ?, ?, ?)
+                                    """, sub, name, number, device_id)
+                                    conn.commit()
+                                    cursor.close()
+                                    
+                                    # Clock in
+                                    cursor = conn.cursor()
+                                    cursor.execute("""
+                                        INSERT INTO TimeClock (SubContractor, Employee, Number, ClockIn, Lat, Lon, Cookie)
+                                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                                    """, sub, name, number, now, lat_float, lon_float, device_id)
+                                    conn.commit()
+                                    cursor.close()
+                                    
+                                    st.success(f"✅ Registered and clocked in at {now.strftime('%H:%M:%S')}")
             except Exception as e:
                 st.error(f"Database error: {str(e)}")
         else:
@@ -145,4 +210,4 @@ if location and location != "No Location Info":
     else:
         st.warning("Incomplete location data. Please try again.")
 else:
-    pass  # Wait for the user to provide location data.
+    st.info("⏳ Waiting for location... Please click the location button above.")
