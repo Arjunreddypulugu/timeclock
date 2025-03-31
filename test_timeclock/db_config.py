@@ -10,5 +10,6 @@ def get_connection():
         f"Database={db['database']};"
         f"UID={db['username']};"
         f"PWD={db['password']};"
+        f"MultipleActiveResultSets=True;"  # Enable MARS
     )
     return pyodbc.connect(connection_string)
