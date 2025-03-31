@@ -63,7 +63,7 @@ st.markdown("""
     /* Subcontractor display with better contrast */
     .subcontractor-info {
         background-color: rgba(38, 39, 48, 0.9);
-        color: white;
+        color: red;
         padding: 10px 15px;
         border-radius: 8px;
         margin-bottom: 15px;
