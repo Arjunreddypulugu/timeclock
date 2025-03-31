@@ -153,20 +153,19 @@ except Exception as e:
     st.session_state["registered"] = False
 
 # ─────────────────────────────────────────────
-# 4. Location handling
+# 4. Location handling - FIXED SECTION
+#if st.button("📍 Click to Fetch Location", type="primary"):
 st.session_state["fetch_location"] = True
 
 if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
     # Add a visually appealing location section
     st.markdown('<div class="location-section"></div>', unsafe_allow_html=True)
     
-    location_col1, location_col2 = st.columns([1, 3])
-    with location_col1:
-        st_lottie(location_animation, height=150, key="location_anim")
-    with location_col2:
-        st.markdown('<h3>📍 Location</h3>', unsafe_allow_html=True)
-        st.write("We need your location to identify your work site.")
-        location = streamlit_geolocation()
+    # Simple location message
+    st.info("📍 Please click the location icon below to share your location")
+    
+    # Get location using streamlit_geolocation
+    location = streamlit_geolocation()
 
     if location and location != "No Location Info":
         if isinstance(location, dict) and 'latitude' in location and 'longitude' in location:
@@ -174,14 +173,12 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
             lon = location['longitude']
 
             if lat is not None and lon is not None:
-                # Display coordinates and map in a card
-                st.markdown(f"""
-                <div class="card">
-                    <h3>📌 Your Location</h3>
-                    <p>Coordinates: {lat}, {lon}</p>
-                </div>
-                """, unsafe_allow_html=True)
+                # Store location in session state for persistence
+                st.session_state["lat"] = lat
+                st.session_state["lon"] = lon
                 
+                # Display coordinates and map with better visibility
+                st.markdown(f'<div class="centered-container"><div class="info-card">📌 Your Location: {lat}, {lon}</div></div>', unsafe_allow_html=True)
                 map_df = pd.DataFrame([{"lat": lat, "lon": lon}])
                 st.map(map_df)
 
