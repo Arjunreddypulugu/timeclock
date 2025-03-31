@@ -366,12 +366,3 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
         st.info("⏳ Getting your location...")
 else:
     st.info("⌛ Click the location button above to get started.")
-
-# Add feedback section
-if st.session_state.get("registered", False):
-    st.markdown("---")
-    st.markdown("### How was your experience today?")
-    feedback = st.radio("Rate your experience:", options=["😞", "😐", "🙂", "😀"], horizontal=True)
-    
-    if st.button("Submit Feedback"):
-        st.success("Thanks for your feedback! We're constantly improving.")
