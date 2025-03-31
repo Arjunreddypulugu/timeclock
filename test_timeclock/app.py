@@ -405,4 +405,4 @@ elif "lat" in st.session_state and "lon" in st.session_state:
                     st.balloons()
                     st.rerun()
 else:
-    st.markdown('<div class="centered-container"><div class="status-message">⌛ Click the location button above to get started.</div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="centered-container"><div class="status-message">⌛</div></div>', unsafe_allow_html=True)
