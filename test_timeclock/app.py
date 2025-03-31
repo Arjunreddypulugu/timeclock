@@ -8,7 +8,7 @@ from streamlit_geolocation import streamlit_geolocation
 from streamlit_cookies_controller import CookieController
 import base64
 import urllib.parse
-from streamlit_geolocation import get_geolocation
+import streamlit_geolocation
 
 # Initialize cookie controller
 cookies = CookieController()
@@ -157,7 +157,7 @@ except Exception as e:
 if st.button("📍 Click to Fetch Location", type="primary"):
     with st.spinner("Fetching your location..."):
         # Direct call to get location without displaying the secondary button
-        location_data = get_geolocation()
+        location_data = streamlit_geolocation()
         
         if location_data and "coords" in location_data:
             coords = location_data["coords"]
