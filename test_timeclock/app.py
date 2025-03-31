@@ -6,6 +6,7 @@ from db_config import get_connection
 from utils import find_customer_from_location
 from streamlit_geolocation import streamlit_geolocation
 import streamlit.components.v1 as components
+import json
 
 st.set_page_config(page_title="Time Clock", layout="centered")
 st.title("🕒 Time Clock")
@@ -15,42 +16,37 @@ st.title("🕒 Time Clock")
 # Create a placeholder for device ID
 if "device_id" not in st.session_state:
     st.session_state["device_id"] = str(uuid.uuid4())  # Temporary ID
-    st.session_state["device_id_received"] = False
 
 # Get persistent device ID from localStorage
-components.html(
-    """
-    <script>
-        // Check if device ID exists in localStorage
-        const storedDeviceId = localStorage.getItem('timeClockDeviceId');
-        
-        if (storedDeviceId) {
-            // Use existing ID - send it to Streamlit
-            window.parent.postMessage(
-                {type: 'streamlit:setComponentValue', value: storedDeviceId}, '*'
-            );
-        } else {
-            // No stored ID - get the temporary one from session state
-            const serverDeviceId = window.streamlitPythonDataInjection;
-            // Store new ID in localStorage for future visits
-            localStorage.setItem('timeClockDeviceId', serverDeviceId);
-            // Send confirmation back to Streamlit
-            window.parent.postMessage(
-                {type: 'streamlit:setComponentValue', value: serverDeviceId}, '*'
-            );
-        }
-    </script>
-    """,
-    height=0,
-    width=0,
-    data=st.session_state["device_id"],
-    key="device_id_component",
-)
+# Pass the device ID by embedding it directly in the script
+device_id_js = f"""
+<script>
+    // Check if device ID exists in localStorage
+    const storedDeviceId = localStorage.getItem('timeClockDeviceId');
+    
+    if (storedDeviceId) {
+        // Use existing ID - send it to Streamlit
+        window.parent.postMessage(
+            {{type: 'streamlit:setComponentValue', value: storedDeviceId}}, '*'
+        );
+    } else {{
+        // No stored ID - store the temporary one
+        const serverDeviceId = "{st.session_state["device_id"]}";
+        // Store new ID in localStorage for future visits
+        localStorage.setItem('timeClockDeviceId', serverDeviceId);
+        // Send confirmation back to Streamlit
+        window.parent.postMessage(
+            {{type: 'streamlit:setComponentValue', value: serverDeviceId}}, '*'
+        );
+    }}
+</script>
+"""
+
+components.html(device_id_js, height=0, width=0, key="device_id_component")
 
 # Receive the device ID from the component
 if "device_id_component" in st.session_state:
     st.session_state["device_id"] = st.session_state["device_id_component"]
-    st.session_state["device_id_received"] = True
 
 device_id = st.session_state["device_id"]
 
@@ -99,9 +95,9 @@ except Exception as e:
 
 # ─────────────────────────────────────────────
 # 4. Location handling
-st.button("📍 Click to Fetch Location", key="fetch_location")
+location_button = st.button("📍 Click to Fetch Location", key="fetch_location")
 
-if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
+if location_button:
     # Get location using streamlit-geolocation
     location = streamlit_geolocation()
 
@@ -195,7 +191,7 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
                                     conn.commit()
                                     cursor.close()
                                     st.success("✅ Device linked. You can now clock in/out.")
-                                    st.experimental_rerun()
+                                    st.rerun()
                             else:
                                 # New user registration
                                 name = st.text_input("🧑 Enter your name:")
