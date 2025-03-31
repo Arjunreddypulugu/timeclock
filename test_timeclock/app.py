@@ -5,39 +5,31 @@ import pandas as pd
 from db_config import get_connection
 from utils import find_customer_from_location
 from streamlit_geolocation import streamlit_geolocation
-import streamlit.components.v1 as components
+from streamlit_cookies_controller import CookieController
+
+# Initialize cookie controller
+cookies = CookieController()
 
 st.set_page_config(page_title="Time Clock", layout="centered", page_icon="⏰")
 st.title("🕒 Time Clock")
 
 # ─────────────────────────────────────────────
-# 1. Subcontractor from URL
+# 1. Device identification using cookies
+stored_device_id = cookies.get(cookie="device_id")
+
+if not stored_device_id:
+    # No cookie found, generate a new device ID
+    device_id = str(uuid.uuid4())
+    # Set cookie with permanent expiration (30 days)
+    cookies.set(cookie="device_id", val=device_id, expires_days=30)
+else:
+    # Use existing device ID from cookie
+    device_id = stored_device_id
+
+# ─────────────────────────────────────────────
+# 2. Subcontractor from URL
 query_params = st.query_params
 sub = query_params.get("sub")
-
-# Initialize device ID using session state
-if "device_id" not in st.session_state:
-    st.session_state["device_id"] = str(uuid.uuid4())
-device_id = st.session_state["device_id"]
-
-# Store device ID in browser's localStorage for persistence across sessions
-components.html(
-    f"""
-    <script>
-    (function() {{
-        // Check if device ID exists in localStorage
-        const storedDeviceId = localStorage.getItem('timeClockDeviceId');
-        
-        if (!storedDeviceId) {{
-            // Store the current device ID
-            localStorage.setItem('timeClockDeviceId', '{device_id}');
-        }}
-    }})();
-    </script>
-    """, 
-    height=0, 
-    width=0
-)
 
 if not sub:
     st.error("Missing subcontractor in URL. Use ?sub=Alpha%20Electrical")
@@ -46,7 +38,7 @@ if not sub:
 st.markdown(f"👷 Subcontractor: {sub}")
 
 # ─────────────────────────────────────────────
-# 2. Check if user is already registered
+# 3. Check if user is already registered
 try:
     conn = get_connection()
     cursor = conn.cursor()
@@ -82,12 +74,11 @@ except Exception as e:
     st.session_state["registered"] = False
 
 # ─────────────────────────────────────────────
-# 3. Location handling
+# 4. Location handling
 if st.button("📍 Click to Fetch Location", type="primary"):
     st.session_state["fetch_location"] = True
 
 if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
-    # Get location using streamlit-geolocation
     location = streamlit_geolocation()
 
     if location and location != "No Location Info":
@@ -102,11 +93,10 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
                 st.map(map_df)
 
                 # ─────────────────────────────────────────────
-                # 4. Customer match with robust cursor management
+                # 5. Customer match
                 try:
                     conn = get_connection()
                     
-                    # Convert location to float to prevent comparison errors
                     try:
                         lat_float = float(lat)
                         lon_float = float(lon)
@@ -125,7 +115,7 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
                     st.success(f"🛠️ Work Site: {customer}")
 
                     # ─────────────────────────────────────────────
-                    # 5. User registration or clock in/out
+                    # 6. User registration or clock in/out
                     if st.session_state.get("registered", False):
                         # User is already registered - show clock in/out options
                         if st.session_state.get("clocked_in", False):
