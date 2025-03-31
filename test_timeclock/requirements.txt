@@ -8,3 +8,4 @@ streamlit_cookies_controller
 streamlit-lottie
 requests
 python-dateutil
+uuid
