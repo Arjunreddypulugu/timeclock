@@ -9,42 +9,12 @@ from streamlit_cookies_controller import CookieController
 import base64
 import urllib.parse
 import streamlit.components.v1 as components
-from streamlit_lottie import st_lottie
-import requests
+
+# Set page config must be the first Streamlit command
+st.set_page_config(page_title="Time Clock", layout="centered", page_icon="⏰")
 
 # Initialize cookie controller
 cookies = CookieController()
-
-# Function to load Lottie animations
-def load_lottieurl(url: str):
-    r = requests.get(url)
-    if r.status_code != 200:
-        return None
-    return r.json()
-
-# Function to show confetti
-def show_confetti():
-    components.html(
-        """
-        <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
-        <script>
-        confetti({
-            particleCount: 100,
-            spread: 70,
-            origin: { y: 0.6 }
-        });
-        </script>
-        """,
-        height=0,
-    )
-
-# Page configuration
-st.set_page_config(
-    page_title="Time Clock",
-    page_icon="⏰",
-    layout="centered",
-    initial_sidebar_state="collapsed"
-)
 
 # Add custom CSS for better styling
 st.markdown("""
@@ -52,14 +22,14 @@ st.markdown("""
     .main {
         padding: 1rem 1rem;
     }
-    .stButton>button {
+    .stButton button {
         width: 100%;
         border-radius: 20px;
         height: 3rem;
         font-weight: bold;
         margin-top: 1rem;
     }
-    div[data-testid="stSuccess"] {
+    div[data-testid="stSuccess"], div[data-testid="stInfo"], div[data-testid="stWarning"] {
         border-radius: 10px;
         padding: 1rem;
         margin: 1rem 0;
@@ -82,16 +52,24 @@ st.markdown("""
         border-radius: 10px; 
         margin-bottom: 20px;
     }
-    .card-title {
-        text-align: center; 
-        margin-top: 0;
-    }
-    .card-content {
-        text-align: center; 
-        margin-bottom: 0;
-    }
 </style>
 """, unsafe_allow_html=True)
+
+# Show confetti effect for celebrations
+def show_confetti():
+    components.html(
+        """
+        <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+        <script>
+        confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 }
+        });
+        </script>
+        """,
+        height=0,
+    )
 
 st.title("🕒 Time Clock")
 
@@ -102,7 +80,7 @@ stored_device_id = cookies.get("device_id")
 if not stored_device_id:
     # No cookie found, generate a new device ID
     device_id = str(uuid.uuid4())
-    # Set cookie
+    # Set cookie - using correct parameter syntax
     cookies.set("device_id", device_id)
 else:
     # Use existing device ID from cookie
@@ -111,7 +89,7 @@ else:
 # ─────────────────────────────────────────────
 # 2. Decode subcontractor from URL
 query_params = st.query_params
-encoded_sub = query_params.get("s")  # Changed from 'sub' to shorter 's'
+encoded_sub = query_params.get("s")  # Using 's' as short parameter name
 
 if not encoded_sub:
     st.error("Missing subcontractor code in URL. Use ?s=[encoded_value]")
@@ -125,7 +103,7 @@ except Exception as e:
     st.error(f"Invalid subcontractor code. Error: {str(e)}")
     st.stop()
 
-# Display subcontractor name with better styling
+# Display subcontractor with better styling
 st.markdown(f"<div class='subcontractor'>👷 Subcontractor: {sub}</div>", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
@@ -142,13 +120,11 @@ try:
         st.session_state["user_name"] = user_data[0]
         st.session_state["user_number"] = user_data[1]
         
-        # User card with welcome message
+        # Show welcome card
         st.markdown(f"""
         <div class="card">
-            <h3 class="card-title">✅ Welcome back!</h3>
-            <p class="card-content">
-                {st.session_state['user_name']}
-            </p>
+            <h3 style="text-align: center; margin-top: 0;">✅ Welcome back!</h3>
+            <p style="text-align: center; margin-bottom: 0;">{st.session_state['user_name']}</p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -162,26 +138,12 @@ try:
         cursor.close()
         
         if active_session:
-            # Calculate time worked
-            now = datetime.now()
-            clock_in_time = datetime.strptime(str(active_session[0]), "%Y-%m-%d %H:%M:%S")
-            elapsed = now - clock_in_time
-            hours, remainder = divmod(elapsed.seconds, 3600)
-            minutes, seconds = divmod(remainder, 60)
+            # Fix datetime parsing by handling microseconds
+            timestamp_str = str(active_session[0]).split('.')[0]
+            clock_in_time = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
             
-            # Show time worked in a card
-            st.markdown(f"""
-            <div class="card">
-                <h3 class="card-title">⏱️ Current Session</h3>
-                <p class="card-content" style="font-size: 1.2rem; font-weight: bold; margin-bottom: 5px;">
-                    Time worked: {hours}h {minutes}m
-                </p>
-                <p class="card-content" style="color: #9e9e9e; margin-top: 0;">
-                    Started at {clock_in_time.strftime('%H:%M:%S')}
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-            
+            # Show active session info
+            st.info(f"⏱️ You are currently clocked in since {clock_in_time.strftime('%H:%M:%S')}")
             st.session_state["clocked_in"] = True
         else:
             st.session_state["clocked_in"] = False
@@ -193,9 +155,7 @@ except Exception as e:
 
 # ─────────────────────────────────────────────
 # 4. Location handling
-st.button("📍 Click to Fetch Location", type="primary", key="fetch_location_btn")
-
-if st.session_state.get("fetch_location_btn", False):
+if st.button("📍 Click to Fetch Location", type="primary"):
     st.session_state["fetch_location"] = True
 
 if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
@@ -232,11 +192,11 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
                         st.error("❌ Not a valid job site.")
                         st.stop()
                     
-                    # Display customer info with better styling
+                    # Display worksite in a card
                     st.markdown(f"""
                     <div class="card">
-                        <h3 class="card-title">🛠️ Work Site</h3>
-                        <p class="card-content">{customer}</p>
+                        <h3 style="text-align: center; margin-top: 0;">🛠️ Work Site</h3>
+                        <p style="text-align: center; margin-bottom: 0;">{customer}</p>
                     </div>
                     """, unsafe_allow_html=True)
 
@@ -256,10 +216,8 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
                                 conn.commit()
                                 cursor.close()
                                 
-                                # Show confetti and success animation
+                                # Show confetti for clock out
                                 show_confetti()
-                                success_lottie = load_lottieurl("https://assets2.lottiefiles.com/packages/lf20_touohxv0.json")
-                                st_lottie(success_lottie, height=120, key="success_animation")
                                 
                                 st.success(f"👋 Clocked out at {now.strftime('%H:%M:%S')}")
                                 st.session_state["clocked_in"] = False
@@ -276,21 +234,20 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
                                 conn.commit()
                                 cursor.close()
                                 
-                                # Show confetti and success animation
+                                # Show confetti for clock in
                                 show_confetti()
-                                success_lottie = load_lottieurl("https://assets9.lottiefiles.com/packages/lf20_jbrw3hcz.json")
-                                st_lottie(success_lottie, height=120, key="success_animation")
                                 
                                 st.success(f"✅ Clocked in at {now.strftime('%H:%M:%S')}")
                                 st.session_state["clocked_in"] = True
                     else:
-                        # New user registration with improved UI
+                        # New user registration with improved styling
                         st.markdown("""
                         <div class="card">
-                            <h3 class="card-title">📝 New User Registration</h3>
+                            <h3 style="text-align: center; margin-top: 0;">📝 New User Registration</h3>
                         </div>
                         """, unsafe_allow_html=True)
                         
+                        # Two-column layout for registration
                         col1, col2 = st.columns(2)
                         with col1:
                             number = st.text_input("📱 Mobile Number:", placeholder="Enter your number")
@@ -312,11 +269,6 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
                                     cursor.execute("UPDATE SubContractorEmployees SET Cookies = ? WHERE Number = ?", device_id, number)
                                     conn.commit()
                                     cursor.close()
-                                    
-                                    # Show success animation
-                                    success_lottie = load_lottieurl("https://assets3.lottiefiles.com/packages/lf20_qpwbiyxf.json")
-                                    st_lottie(success_lottie, height=120, key="link_success")
-                                    
                                     st.success("✅ Device linked. You can now clock in/out.")
                                     st.rerun()
                             elif name:
@@ -342,10 +294,8 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
                                     conn.commit()
                                     cursor.close()
                                     
-                                    # Show confetti and success animation
+                                    # Show confetti
                                     show_confetti()
-                                    success_lottie = load_lottieurl("https://assets1.lottiefiles.com/packages/lf20_vyr9sizf.json")
-                                    st_lottie(success_lottie, height=150, key="register_success")
                                     
                                     st.success(f"✅ Registered and clocked in at {now.strftime('%H:%M:%S')}")
                                     st.session_state["registered"] = True
@@ -360,9 +310,6 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
         else:
             st.warning("Incomplete location data. Please try again.")
     else:
-        # Show loading animation
-        loading_lottie = load_lottieurl("https://assets3.lottiefiles.com/packages/lf20_x62chJ.json")
-        st_lottie(loading_lottie, height=200, key="location_loading")
-        st.info("⏳ Getting your location...")
+        st.info("⏳ Waiting for location...")
 else:
     st.info("⌛ Click the location button above to get started.")
