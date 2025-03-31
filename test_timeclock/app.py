@@ -8,94 +8,77 @@ from streamlit_geolocation import streamlit_geolocation
 from streamlit_cookies_controller import CookieController
 import base64
 import urllib.parse
-from streamlit_lottie import st_lottie
-import requests
-import json
 
 # Initialize cookie controller
 cookies = CookieController()
 
-# Page configuration with wide layout for better spacing
-st.set_page_config(
-    page_title="Time Clock", 
-    layout="wide", 
-    page_icon="⏰",
-    initial_sidebar_state="collapsed"
-)
+st.set_page_config(page_title="Time Clock", layout="centered", page_icon="⏰")
 
-# Load Lottie animations
-def load_lottieurl(url: str):
-    r = requests.get(url)
-    if r.status_code != 200:
-        return None
-    return r.json()
-
-# Lottie animations
-clock_animation = load_lottieurl("https://assets10.lottiefiles.com/packages/lf20_ystsffqy.json")
-success_animation = load_lottieurl("https://assets2.lottiefiles.com/packages/lf20_touohxv0.json")
-location_animation = load_lottieurl("https://assets3.lottiefiles.com/packages/lf20_UgZWvP.json")
-
-# Custom CSS
+# Custom CSS to improve readability and centering
 st.markdown("""
 <style>
+    /* Main header styling */
     .main-header {
-        font-size: 2.5rem;
-        margin-bottom: 1rem;
         text-align: center;
+        margin-bottom: 1.5rem;
     }
-    .subheader {
-        font-size: 1.5rem;
-        margin-bottom: 1rem;
-    }
-    .card {
-        padding: 1.5rem;
-        border-radius: 0.7rem;
-        background: #f0f2f6;
-        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
-        margin: 1rem 0;
-    }
-    .dark-card {
-        background: #262730;
-        color: #fff;
-    }
-    .big-button {
-        font-size: 1.2rem !important;
-        height: 3rem !important;
-        margin: 1rem 0 !important;
-    }
-    .clock-display {
-        font-size: 2rem;
-        font-weight: bold;
-        text-align: center;
-        margin: 1rem 0;
-    }
-    .centered {
-        display: flex;
-        justify-content: center;
-    }
-    .location-section {
-        margin-top: 1rem;
-        padding-top: 1rem;
-        border-top: 1px solid #e6e6e6;
-    }
+    
+    /* Status messages styling */
     .status-message {
-        padding: 1rem;
-        border-radius: 0.5rem;
-        margin: 1rem 0;
+        background-color: rgba(38, 39, 48, 0.8);
+        border-radius: 10px;
+        padding: 15px;
+        margin: 10px 0;
+        text-align: center;
+        border: 1px solid rgba(250, 250, 250, 0.2);
     }
-    .divider {
-        height: 3px;
-        background-color: #e6e6e6;
-        margin: 2rem 0;
+    
+    /* Centered container for important information */
+    .centered-container {
+        text-align: center;
+        margin: 1rem auto;
+        max-width: 600px;
+    }
+    
+    /* Highlighted time display */
+    .time-highlight {
+        font-weight: bold;
+        font-size: 1.1em;
+        color: #ff9d00;
+        background-color: rgba(38, 39, 48, 0.8);
+        padding: 5px 10px;
+        border-radius: 5px;
+        margin: 0 5px;
+    }
+    
+    /* Info card with better contrast */
+    .info-card {
+        background-color: rgba(38, 39, 48, 0.9);
+        border-radius: 10px;
+        padding: 15px;
+        margin: 15px 0;
+        border: 1px solid rgba(250, 250, 250, 0.2);
+    }
+    
+    /* Subcontractor display with better contrast */
+    .subcontractor-info {
+        background-color: rgba(38, 39, 48, 0.9);
+        color: white;
+        padding: 10px 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        display: inline-block;
+    }
+    
+    /* Button improvements */
+    .stButton>button {
+        width: 100%;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# App header with animation
-col1, col2, col3 = st.columns([1, 2, 1])
-with col2:
-    st.markdown('<div class="main-header">🕒 Time Clock</div>', unsafe_allow_html=True)
-    st_lottie(clock_animation, height=150, key="clock_anim")
+# App title in centered container
+st.markdown('<div class="main-header"><h1>🕒 Time Clock</h1></div>', unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
 # 1. Device identification using cookies
@@ -127,13 +110,8 @@ except Exception as e:
     st.error(f"Invalid subcontractor code. Error: {str(e)}")
     st.stop()
 
-# Subcontractor info in a card
-st.markdown(f"""
-<div class="card">
-    <h3>👷 Subcontractor: {sub}</h3>
-    <p>Time Clock System</p>
-</div>
-""", unsafe_allow_html=True)
+# Display subcontractor with better contrast
+st.markdown(f'<div class="centered-container"><div class="subcontractor-info">👷 Subcontractor: {sub}</div></div>', unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
 # 3. Check if user is already registered
@@ -149,7 +127,8 @@ try:
         st.session_state["user_name"] = user_data[0]
         st.session_state["user_number"] = user_data[1]
         
-        st.success(f"✅ Welcome back, {st.session_state['user_name']}!")
+        # Centered welcome message
+        st.markdown(f'<div class="centered-container"><div class="status-message">✅ Welcome back, {st.session_state["user_name"]}!</div></div>', unsafe_allow_html=True)
         
         # Check if already clocked in
         cursor = conn.cursor()
@@ -161,7 +140,8 @@ try:
         cursor.close()
         
         if active_session:
-            st.info(f"⏱️ You are currently clocked in since {active_session[0]}")
+            # Centered clock-in status with highlighted time
+            st.markdown(f'<div class="centered-container"><div class="status-message">⏱️ You are currently clocked in since <span class="time-highlight">{active_session[0]}</span></div></div>', unsafe_allow_html=True)
             st.session_state["clocked_in"] = True
         else:
             st.session_state["clocked_in"] = False
@@ -173,19 +153,11 @@ except Exception as e:
 
 # ─────────────────────────────────────────────
 # 4. Location handling
-st.session_state["fetch_location"] = True
+if st.button("📍 Click to Fetch Location", type="primary"):
+    st.session_state["fetch_location"] = True
 
 if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
-    # Add a visually appealing location section
-    st.markdown('<div class="location-section"></div>', unsafe_allow_html=True)
-    
-    location_col1, location_col2 = st.columns([1, 3])
-    with location_col1:
-        st_lottie(location_animation, height=150, key="location_anim")
-    with location_col2:
-        st.markdown('<h3>📍 Location Services</h3>', unsafe_allow_html=True)
-        st.write("We need your location to identify your work site.")
-        location = streamlit_geolocation()
+    location = streamlit_geolocation()
 
     if location and location != "No Location Info":
         if isinstance(location, dict) and 'latitude' in location and 'longitude' in location:
@@ -193,14 +165,8 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
             lon = location['longitude']
 
             if lat is not None and lon is not None:
-                # Display coordinates and map in a card
-                st.markdown(f"""
-                <div class="card">
-                    <h3>📌 Your Location</h3>
-                    <p>Coordinates: {lat}, {lon}</p>
-                </div>
-                """, unsafe_allow_html=True)
-                
+                # Display coordinates and map with better visibility
+                st.markdown(f'<div class="centered-container"><div class="info-card">📌 Your Location: {lat}, {lon}</div></div>', unsafe_allow_html=True)
                 map_df = pd.DataFrame([{"lat": lat, "lon": lon}])
                 st.map(map_df)
 
@@ -224,16 +190,8 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
                         st.error("❌ Not a valid job site.")
                         st.stop()
                     
-                    # Display work site in a card
-                    st.markdown(f"""
-                    <div class="card">
-                        <h3>🛠️ Work Site</h3>
-                        <p>{customer}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                    # Add a visual divider
-                    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+                    # Display work site with better visibility
+                    st.markdown(f'<div class="centered-container"><div class="info-card">🛠️ Work Site: {customer}</div></div>', unsafe_allow_html=True)
 
                     # ─────────────────────────────────────────────
                     # 6. User registration or clock in/out
@@ -241,17 +199,10 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
                         # User is already registered - show clock in/out options
                         if st.session_state.get("clocked_in", False):
                             # User is already clocked in - offer clock out
-                            st.markdown(f"""
-                            <div class="card dark-card">
-                                <h3>⏱️ Current Status: Clocked In</h3>
-                                <p>You are currently on the clock at {customer}.</p>
-                            </div>
-                            """, unsafe_allow_html=True)
-                            
-                            # Enhanced clock out button
+                            st.markdown('<div class="centered-container"><div class="status-message">⏱️ Current Status: Clocked In</div></div>', unsafe_allow_html=True)
                             col1, col2, col3 = st.columns([1, 2, 1])
                             with col2:
-                                if st.button("🚪 Clock Out", key="clock_out_btn", use_container_width=True):
+                                if st.button("🚪 Clock Out"):
                                     now = datetime.now()
                                     cursor = conn.cursor()
                                     cursor.execute("""
@@ -260,24 +211,15 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
                                     """, now, device_id)
                                     conn.commit()
                                     cursor.close()
-                                    
-                                    # Show success animation and message
-                                    st_lottie(success_animation, height=200, key="success_anim")
-                                    st.success(f"👋 Clocked out successfully at {now.strftime('%H:%M:%S')}")
+                                    time_str = now.strftime('%H:%M:%S')
+                                    st.markdown(f'<div class="centered-container"><div class="status-message">👋 Clocked out at <span class="time-highlight">{time_str}</span></div></div>', unsafe_allow_html=True)
                                     st.session_state["clocked_in"] = False
                         else:
                             # User is registered but not clocked in - offer clock in
-                            st.markdown(f"""
-                            <div class="card dark-card">
-                                <h3>⏱️ Current Status: Not Clocked In</h3>
-                                <p>Ready to start work at {customer}?</p>
-                            </div>
-                            """, unsafe_allow_html=True)
-                            
-                            # Enhanced clock in button
+                            st.markdown('<div class="centered-container"><div class="status-message">⏱️ Current Status: Not Clocked In</div></div>', unsafe_allow_html=True)
                             col1, col2, col3 = st.columns([1, 2, 1])
                             with col2:
-                                if st.button("⏱️ Clock In", key="clock_in_btn", type="primary", use_container_width=True):
+                                if st.button("⏱️ Clock In"):
                                     now = datetime.now()
                                     cursor = conn.cursor()
                                     cursor.execute("""
@@ -287,20 +229,16 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
                                        now, lat_float, lon_float, device_id)
                                     conn.commit()
                                     cursor.close()
-                                    
-                                    # Show celebration effects
-                                    st_lottie(success_animation, height=200, key="success_anim")
+                                    time_str = now.strftime('%H:%M:%S')
+                                    st.markdown(f'<div class="centered-container"><div class="status-message">✅ Clocked in at <span class="time-highlight">{time_str}</span></div></div>', unsafe_allow_html=True)
                                     st.balloons()
-                                    st.success(f"✅ Clocked in successfully at {now.strftime('%H:%M:%S')}")
                                     st.session_state["clocked_in"] = True
                     else:
-                        # New user registration with improved UI
-                        st.markdown('<h2 class="subheader">📝 New User Registration</h2>', unsafe_allow_html=True)
-                        
-                        # Registration form in columns for better layout
+                        # New user registration
+                        st.markdown('<div class="centered-container"><h3>📝 New User Registration</h3></div>', unsafe_allow_html=True)
                         col1, col2 = st.columns(2)
                         with col1:
-                            number = st.text_input("📱 Mobile Number:", placeholder="Enter your mobile number")
+                            number = st.text_input("📱 Enter your mobile number:")
                         
                         if number:
                             # Check if number exists but on a different device
@@ -311,23 +249,20 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
                             
                             if existing:
                                 # User exists but on different device
-                                st.info("⚠️ This number is already registered. Link this device to your existing account.")
-                                if st.button("🔄 Link Device to Account", type="primary", use_container_width=True):
+                                st.markdown('<div class="centered-container">This number is already registered. Link this device to your existing account.</div>', unsafe_allow_html=True)
+                                if st.button("🔄 Link this device to your account"):
                                     cursor = conn.cursor()
                                     cursor.execute("UPDATE SubContractorEmployees SET Cookies = ? WHERE Number = ?", device_id, number)
                                     conn.commit()
                                     cursor.close()
-                                    st.success("✅ Device linked successfully!")
-                                    # Show animation
-                                    st_lottie(success_animation, height=150, key="link_success")
+                                    st.markdown('<div class="centered-container"><div class="status-message">✅ Device linked. You can now clock in/out.</div></div>', unsafe_allow_html=True)
                                     st.rerun()
                             else:
                                 # New user registration
                                 with col2:
-                                    name = st.text_input("🧑 Full Name:", placeholder="Enter your full name")
-                                
+                                    name = st.text_input("🧑 Enter your name:")
                                 if name:
-                                    if st.button("✅ Register & Clock In", type="primary", use_container_width=True):
+                                    if st.button("✅ Register & Clock In"):
                                         now = datetime.now()
                                         
                                         # Register user
@@ -348,10 +283,9 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
                                         conn.commit()
                                         cursor.close()
                                         
-                                        # Show celebration effects
-                                        st_lottie(success_animation, height=200, key="registration_success")
+                                        time_str = now.strftime('%H:%M:%S')
+                                        st.markdown(f'<div class="centered-container"><div class="status-message">✅ Registered and clocked in at <span class="time-highlight">{time_str}</span></div></div>', unsafe_allow_html=True)
                                         st.balloons()
-                                        st.success(f"✅ Welcome aboard! You've been registered and clocked in at {now.strftime('%H:%M:%S')}")
                                         st.session_state["registered"] = True
                                         st.session_state["user_name"] = name
                                         st.session_state["user_number"] = number
@@ -364,17 +298,6 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
         else:
             st.warning("Incomplete location data. Please try again.")
     else:
-        # More visually appealing waiting message with animation
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.info("⏳ Waiting for location...")
-            st_lottie(location_animation, height=200, key="waiting_location")
+        st.markdown('<div class="centered-container"><div class="status-message">⏳ Waiting for location...</div></div>', unsafe_allow_html=True)
 else:
-    st.info("⌛ Click the location button above to get started.")
-
-# Footer
-st.markdown("""
-<div style="text-align: center; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #e6e6e6;">
-    <p>© 2025 Time Clock System</p>
-</div>
-""", unsafe_allow_html=True)
+    st.markdown('<div class="centered-container"><div class="status-message">⌛ Click the location button above to get started.</div></div>', unsafe_allow_html=True)
