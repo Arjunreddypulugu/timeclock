@@ -8,7 +8,6 @@ from streamlit_geolocation import streamlit_geolocation
 from streamlit_cookies_controller import CookieController
 import base64
 import urllib.parse
-import streamlit_geolocation
 
 # Initialize cookie controller
 cookies = CookieController()
@@ -74,6 +73,15 @@ st.markdown("""
     /* Button improvements */
     .stButton>button {
         width: 100%;
+    }
+    
+    /* Location section styling */
+    .location-section {
+        margin-top: 15px;
+        margin-bottom: 15px;
+        padding: 15px;
+        border-radius: 10px;
+        background-color: rgba(38, 39, 48, 0.5);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -154,8 +162,8 @@ except Exception as e:
 
 # ─────────────────────────────────────────────
 # 4. Location handling - FIXED SECTION
-#if st.button("📍 Click to Fetch Location", type="primary"):
-st.session_state["fetch_location"] = True
+if st.button("📍 Click to Fetch Location", type="primary"):
+    st.session_state["fetch_location"] = True
 
 if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
     # Add a visually appealing location section
@@ -326,9 +334,11 @@ if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
                 except Exception as e:
                     st.error(f"Database error: {str(e)}")
             else:
-                st.error("Could not retrieve precise location. Please try again or check your browser permissions.")
+                st.warning("📍 Please click on the location icon above to get started.")
         else:
-            st.error("Location access denied or unavailable. Please allow location access and try again.")
+            st.warning("Incomplete location data. Please try again.")
+    else:
+        st.info("⏳ Waiting for location... Please click the location icon that appears")
 # If user has already fetched location (stored in session state), display it again
 elif "lat" in st.session_state and "lon" in st.session_state:
     # Use stored location data
