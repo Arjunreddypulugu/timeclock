@@ -4,3 +4,4 @@ geopy
 streamlit-js-eval
 streamlit-geolocation
 pandas
+streamlit_cookies_controller
