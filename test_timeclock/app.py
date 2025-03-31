@@ -6,6 +6,8 @@ from db_config import get_connection
 from utils import find_customer_from_location
 from streamlit_geolocation import streamlit_geolocation
 from streamlit_cookies_controller import CookieController
+import base64
+import urllib.parse
 
 # Initialize cookie controller
 cookies = CookieController()
@@ -15,7 +17,7 @@ st.title("🕒 Time Clock")
 
 # ─────────────────────────────────────────────
 # 1. Device identification using cookies
-stored_device_id = cookies.get("device_id")  # Fixed: removed the 'cookie=' keyword argument
+stored_device_id = cookies.get("device_id")  
 
 if not stored_device_id:
     # No cookie found, generate a new device ID
@@ -27,12 +29,20 @@ else:
     device_id = stored_device_id
 
 # ─────────────────────────────────────────────
-# 2. Subcontractor from URL
+# 2. Decode subcontractor from URL
 query_params = st.query_params
-sub = query_params.get("sub")
+encoded_sub = query_params.get("s")  # Changed from 'sub' to shorter 's'
 
-if not sub:
-    st.error("Missing subcontractor in URL. Use ?sub=Alpha%20Electrical")
+if not encoded_sub:
+    st.error("Missing subcontractor code in URL. Use ?s=[encoded_value]")
+    st.stop()
+
+try:
+    # URL decode then base64 decode
+    decoded_bytes = base64.b64decode(urllib.parse.unquote(encoded_sub))
+    sub = decoded_bytes.decode('utf-8')
+except Exception as e:
+    st.error(f"Invalid subcontractor code. Error: {str(e)}")
     st.stop()
 
 st.markdown(f"👷 Subcontractor: {sub}")
