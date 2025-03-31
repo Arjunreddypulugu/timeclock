@@ -5,3 +5,6 @@ streamlit-js-eval
 streamlit-geolocation
 pandas
 streamlit_cookies_controller
+streamlit-lottie
+requests
+python-dateutil
