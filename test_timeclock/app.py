@@ -64,7 +64,7 @@ st.markdown("""
     /* Subcontractor display with better contrast */
     .subcontractor-info {
         background-color: rgba(38, 39, 48, 0.9);
-        color: red;
+        color: white;
         padding: 10px 15px;
         border-radius: 8px;
         margin-bottom: 15px;
@@ -165,6 +165,10 @@ if st.button("📍 Click to Fetch Location", type="primary"):
             lon = coords.get("longitude")
             
             if lat is not None and lon is not None:
+                # Store location in session state for use after button clicks
+                st.session_state["lat"] = lat
+                st.session_state["lon"] = lon
+                
                 # Display coordinates and map with better visibility
                 st.markdown(f'<div class="centered-container"><div class="info-card">📌 Your Location: {lat}, {lon}</div></div>', unsafe_allow_html=True)
                 map_df = pd.DataFrame([{"lat": lat, "lon": lon}])
@@ -179,8 +183,14 @@ if st.button("📍 Click to Fetch Location", type="primary"):
                         lat_float = float(lat)
                         lon_float = float(lon)
                         
+                        # Store the float values in session state too
+                        st.session_state["lat_float"] = lat_float
+                        st.session_state["lon_float"] = lon_float
+                        
                         # Find customer based on location
                         customer = find_customer_from_location(lat_float, lon_float, conn)
+                        # Store customer in session state
+                        st.session_state["customer"] = customer
                         
                     except (TypeError, ValueError) as e:
                         st.error(f"Invalid location format: {str(e)}")
@@ -193,16 +203,6 @@ if st.button("📍 Click to Fetch Location", type="primary"):
                     # Display work site with better visibility
                     st.markdown(f'<div class="centered-container"><div class="info-card">🛠️ Work Site: {customer}</div></div>', unsafe_allow_html=True)
                     
-                    # Rest of your code for registration and clock in/out...
-                    
-                except Exception as e:
-                    st.error(f"Database error: {str(e)}")
-            else:
-                st.error("Could not retrieve precise location. Please try again or check your browser permissions.")
-        else:
-            st.error("Location access denied or unavailable. Please allow location access and try again.")
-else:
-    st.info("👆 Click the button above to get started")
                     # ─────────────────────────────────────────────
                     # 6. User registration or clock in/out
                     if st.session_state.get("registered", False):
@@ -221,9 +221,14 @@ else:
                                     """, now, device_id)
                                     conn.commit()
                                     cursor.close()
-                                    time_str = now.strftime('%H:%M:%S')
-                                    st.markdown(f'<div class="centered-container"><div class="status-message">👋 Clocked out at <span class="time-highlight">{time_str}</span></div></div>', unsafe_allow_html=True)
+                                    
+                                    # Update session state
                                     st.session_state["clocked_in"] = False
+                                    time_str = now.strftime('%H:%M:%S')
+                                    
+                                    # Show success message
+                                    st.markdown(f'<div class="centered-container"><div class="status-message">👋 Clocked out at <span class="time-highlight">{time_str}</span></div></div>', unsafe_allow_html=True)
+                                    st.rerun()  # Rerun to update UI immediately
                         else:
                             # User is registered but not clocked in - offer clock in
                             st.markdown('<div class="centered-container"><div class="status-message">⏱️ Current Status: Not Clocked In</div></div>', unsafe_allow_html=True)
@@ -239,10 +244,15 @@ else:
                                        now, lat_float, lon_float, device_id)
                                     conn.commit()
                                     cursor.close()
+                                    
+                                    # Update session state
+                                    st.session_state["clocked_in"] = True
                                     time_str = now.strftime('%H:%M:%S')
+                                    
+                                    # Show success message
                                     st.markdown(f'<div class="centered-container"><div class="status-message">✅ Clocked in at <span class="time-highlight">{time_str}</span></div></div>', unsafe_allow_html=True)
                                     st.balloons()
-                                    st.session_state["clocked_in"] = True
+                                    st.rerun()  # Rerun to update UI immediately
                     else:
                         # New user registration
                         st.markdown('<div class="centered-container"><h3>📝 New User Registration</h3></div>', unsafe_allow_html=True)
@@ -266,6 +276,7 @@ else:
                                     conn.commit()
                                     cursor.close()
                                     st.markdown('<div class="centered-container"><div class="status-message">✅ Device linked. You can now clock in/out.</div></div>', unsafe_allow_html=True)
+                                    st.session_state["registered"] = True
                                     st.rerun()
                             else:
                                 # New user registration
@@ -293,21 +304,87 @@ else:
                                         conn.commit()
                                         cursor.close()
                                         
-                                        time_str = now.strftime('%H:%M:%S')
-                                        st.markdown(f'<div class="centered-container"><div class="status-message">✅ Registered and clocked in at <span class="time-highlight">{time_str}</span></div></div>', unsafe_allow_html=True)
-                                        st.balloons()
+                                        # Update session state
                                         st.session_state["registered"] = True
                                         st.session_state["user_name"] = name
                                         st.session_state["user_number"] = number
                                         st.session_state["clocked_in"] = True
-
+                                        
+                                        time_str = now.strftime('%H:%M:%S')
+                                        st.markdown(f'<div class="centered-container"><div class="status-message">✅ Registered and clocked in at <span class="time-highlight">{time_str}</span></div></div>', unsafe_allow_html=True)
+                                        st.balloons()
+                                        st.rerun()  # Rerun to update UI immediately
+                    
                 except Exception as e:
                     st.error(f"Database error: {str(e)}")
             else:
-                st.warning("📍 Please click on the location icon above to get started.")
+                st.error("Could not retrieve precise location. Please try again or check your browser permissions.")
         else:
-            st.warning("Incomplete location data. Please try again.")
-    else:
-        st.markdown('<div class="centered-container"><div class="status-message">⏳ Waiting for location...</div></div>', unsafe_allow_html=True)
+            st.error("Location access denied or unavailable. Please allow location access and try again.")
+# If user has already fetched location (stored in session state), display it again
+elif "lat" in st.session_state and "lon" in st.session_state:
+    # Use stored location data
+    lat = st.session_state["lat"]
+    lon = st.session_state["lon"]
+    
+    # Display coordinates and map
+    st.markdown(f'<div class="centered-container"><div class="info-card">📌 Your Location: {lat}, {lon}</div></div>', unsafe_allow_html=True)
+    map_df = pd.DataFrame([{"lat": lat, "lon": lon}])
+    st.map(map_df)
+    
+    # Display stored customer info
+    if "customer" in st.session_state:
+        st.markdown(f'<div class="centered-container"><div class="info-card">🛠️ Work Site: {st.session_state["customer"]}</div></div>', unsafe_allow_html=True)
+    
+    # Show appropriate clock in/out UI based on current status
+    if st.session_state.get("registered", False):
+        if st.session_state.get("clocked_in", False):
+            # Show clock out UI
+            st.markdown('<div class="centered-container"><div class="status-message">⏱️ Current Status: Clocked In</div></div>', unsafe_allow_html=True)
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                if st.button("🚪 Clock Out"):
+                    now = datetime.now()
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        UPDATE TimeClock SET ClockOut = ?
+                        WHERE Cookie = ? AND ClockOut IS NULL
+                    """, now, device_id)
+                    conn.commit()
+                    cursor.close()
+                    
+                    # Update session state
+                    st.session_state["clocked_in"] = False
+                    time_str = now.strftime('%H:%M:%S')
+                    
+                    # Show success message
+                    st.markdown(f'<div class="centered-container"><div class="status-message">👋 Clocked out at <span class="time-highlight">{time_str}</span></div></div>', unsafe_allow_html=True)
+                    st.rerun()
+        else:
+            # Show clock in UI
+            st.markdown('<div class="centered-container"><div class="status-message">⏱️ Current Status: Not Clocked In</div></div>', unsafe_allow_html=True)
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                if st.button("⏱️ Clock In"):
+                    now = datetime.now()
+                    lat_float = st.session_state["lat_float"]
+                    lon_float = st.session_state["lon_float"]
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        INSERT INTO TimeClock (SubContractor, Employee, Number, ClockIn, Lat, Lon, Cookie)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, sub, st.session_state["user_name"], st.session_state["user_number"], 
+                       now, lat_float, lon_float, device_id)
+                    conn.commit()
+                    cursor.close()
+                    
+                    # Update session state
+                    st.session_state["clocked_in"] = True
+                    time_str = now.strftime('%H:%M:%S')
+                    
+                    # Show success message and celebration
+                    st.markdown(f'<div class="centered-container"><div class="status-message">✅ Clocked in at <span class="time-highlight">{time_str}</span></div></div>', unsafe_allow_html=True)
+                    st.balloons()
+                    st.rerun()
 else:
     st.markdown('<div class="centered-container"><div class="status-message">⌛ Click the location button above to get started.</div></div>', unsafe_allow_html=True)
