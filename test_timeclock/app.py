@@ -15,13 +15,13 @@ st.title("🕒 Time Clock")
 
 # ─────────────────────────────────────────────
 # 1. Device identification using cookies
-stored_device_id = cookies.get(cookie="device_id")
+stored_device_id = cookies.get("device_id")  # Fixed: removed the 'cookie=' keyword argument
 
 if not stored_device_id:
     # No cookie found, generate a new device ID
     device_id = str(uuid.uuid4())
-    # Set cookie with permanent expiration (30 days)
-    cookies.set(cookie="device_id", val=device_id, expires_days=30)
+    # Set cookie - using correct parameter syntax
+    cookies.set("device_id", device_id)
 else:
     # Use existing device ID from cookie
     device_id = stored_device_id
