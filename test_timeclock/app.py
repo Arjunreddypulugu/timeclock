@@ -153,8 +153,8 @@ except Exception as e:
 
 # ─────────────────────────────────────────────
 # 4. Location handling
-if st.button("📍 Click to Fetch Location", type="primary"):
-    st.session_state["fetch_location"] = True
+#if st.button("📍 Click to Fetch Location", type="primary"):
+st.session_state["fetch_location"] = True
 
 if "fetch_location" in st.session_state and st.session_state["fetch_location"]:
     location = streamlit_geolocation()
