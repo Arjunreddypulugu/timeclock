@@ -93,6 +93,14 @@ st.markdown("""<style>
         margin: 10px 0;
     }
 </style>""", unsafe_allow_html=True)
+
+# Add this before your existing title markup
+st.markdown(f"""
+<div class="centered-container">
+    <img src="https://vdrs.com/wp-content/uploads/2022/08/VDRS-lockup-mod-8-19-22-350.png" style="max-width: 300px; display: block; margin: 0 auto;">
+</div>
+""", unsafe_allow_html=True)
+
 # App title in centered container
 st.markdown('<div class="main-header"><h1>🕒 Time Clock</h1></div>', unsafe_allow_html=True)
 
