@@ -15,85 +15,76 @@ cookies = CookieController()
 st.set_page_config(page_title="Time Clock", layout="centered", page_icon="⏰")
 
 # Custom CSS to improve readability and centering
-st.markdown("""<style>
-    /* Theme-adaptive styles */
+st.markdown("""
+<style>
+    /* Main header styling */
     .main-header {
         text-align: center;
         margin-bottom: 1.5rem;
-        color: var(--text-color);
     }
     
+    /* Status messages styling */
     .status-message {
-        background-color: var(--secondary-background-color);
+        background-color: rgba(38, 39, 48, 0.8);
         border-radius: 10px;
         padding: 15px;
         margin: 10px 0;
         text-align: center;
-        border: 1px solid var(--border-color);
-        color: var(--text-color);
+        border: 1px solid rgba(250, 250, 250, 0.2);
     }
     
+    /* Centered container for important information */
     .centered-container {
         text-align: center;
         margin: 1rem auto;
         max-width: 600px;
     }
     
+    /* Highlighted time display */
     .time-highlight {
         font-weight: bold;
         font-size: 1.1em;
-        color: var(--primary-color);
-        background-color: var(--background-color);
+        color: #ff9d00;
+        background-color: rgba(38, 39, 48, 0.8);
         padding: 5px 10px;
         border-radius: 5px;
         margin: 0 5px;
-        border: 1px solid var(--border-color);
     }
     
+    /* Info card with better contrast */
     .info-card {
-        background-color: var(--secondary-background-color);
+        background-color: rgba(38, 39, 48, 0.9);
         border-radius: 10px;
         padding: 15px;
         margin: 15px 0;
-        border: 1px solid var(--border-color);
-        color: var(--text-color);
+        border: 1px solid rgba(250, 250, 250, 0.2);
     }
     
+    /* Subcontractor display with better contrast */
     .subcontractor-info {
-        background-color: var(--primary-color);
-        color: var(--button-text-color);
+        background-color: rgba(38, 39, 48, 0.9);
+        color: white;
         padding: 10px 15px;
         border-radius: 8px;
         margin-bottom: 15px;
         display: inline-block;
     }
     
+    /* Button improvements */
     .stButton>button {
         width: 100%;
-        border: 1px solid var(--border-color) !important;
     }
     
+    /* Location section styling */
     .location-section {
         margin-top: 15px;
         margin-bottom: 15px;
         padding: 15px;
         border-radius: 10px;
-        background-color: var(--background-color);
+        background-color: rgba(38, 39, 48, 0.5);
     }
-    
-    /* Better contrast for all text */
-    body {
-        color: var(--text-color) !important;
-    }
-    
-    /* Adaptive map container */
-    .stMap {
-        border: 2px solid var(--border-color);
-        border-radius: 10px;
-        margin: 10px 0;
-    }
-</style>""", unsafe_allow_html=True)
-
+</style>
+""", unsafe_allow_html=True)
 
 # App title in centered container
 st.markdown('<div class="main-header"><h1>🕒 Time Clock</h1></div>', unsafe_allow_html=True)
