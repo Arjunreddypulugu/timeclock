@@ -14,7 +14,10 @@ cookies = CookieController()
 
 st.set_page_config(page_title="Time Clock", layout="centered", page_icon="⏰")
 
-# [Keep all your existing CSS styles here]
+# Custom CSS styles (keep your existing styles here)
+st.markdown("""<style>
+    [Your existing CSS styles]
+</style>""", unsafe_allow_html=True)
 
 # Logo and title 
 st.markdown(f"""
@@ -66,7 +69,7 @@ try:
                 
                 st.markdown(f'<div class="centered-container"><div class="status-message">✅ Welcome back, {user_data[0]}!</div></div>', unsafe_allow_html=True)
                 
-                # Check for active sessions by number
+                # Check for active sessions
                 cursor.execute("""
                     SELECT TOP 1 ClockIn FROM TimeClock 
                     WHERE Number = ? AND ClockOut IS NULL 
@@ -120,13 +123,12 @@ if st.session_state.get("fetch_location"):
                 st.markdown(f'<div class="centered-container"><div class="info-card">🛠️ Work Site: {customer}</div></div>', unsafe_allow_html=True)
                 
                 # ─────────────────────────────────────────────
-                # 5. Clock operations with session validation
+                # 5. Clock operations with notes
                 if st.session_state.get("registered"):
                     if st.session_state.get("clocked_in"):
                         # Clock Out UI
                         st.markdown('<div class="centered-container"><div class="status-message">⏱️ Current Status: Clocked In</div></div>', unsafe_allow_html=True)
 
-                        # Add Clock Out Notes
                         clock_out_notes = st.text_area(
                             "📝 Add closing notes:",
                             placeholder="Describe work completed or any issues...",
@@ -139,7 +141,6 @@ if st.session_state.get("fetch_location"):
                                 with get_connection() as conn:
                                     with conn.cursor() as cursor:
                                         now = datetime.now()
-                                        # Update with notes and use device_id for safety
                                         cursor.execute("""
                                             UPDATE TimeClock SET 
                                             ClockOut = ?,
@@ -154,7 +155,6 @@ if st.session_state.get("fetch_location"):
                         # Clock In UI
                         st.markdown('<div class="centered-container"><div class="status-message">⏱️ Current Status: Not Clocked In</div></div>', unsafe_allow_html=True)
 
-                        # Add Clock In Notes
                         clock_in_notes = st.text_area(
                             "📝 Add opening notes:",
                             placeholder="Describe planned work or special instructions...",
@@ -167,7 +167,6 @@ if st.session_state.get("fetch_location"):
                                 with get_connection() as conn:
                                     with conn.cursor() as cursor:
                                         now = datetime.now()
-                                        # Insert with notes
                                         cursor.execute("""
                                             INSERT INTO TimeClock (
                                                 SubContractor, 
@@ -212,7 +211,6 @@ if st.session_state.get("fetch_location"):
                                 existing = cursor.fetchone()
                                 
                                 if existing:
-                                    # Auto-update cookie for existing number
                                     cursor.execute("""
                                         UPDATE SubContractorEmployees 
                                         SET Cookies = ? 
@@ -220,7 +218,6 @@ if st.session_state.get("fetch_location"):
                                     """, (device_id, number))
                                     conn.commit()
                                     
-                                    # Check for existing session
                                     cursor.execute("""
                                         SELECT TOP 1 ClockIn FROM TimeClock 
                                         WHERE Number = ? AND ClockOut IS NULL
@@ -247,7 +244,6 @@ if st.session_state.get("fetch_location"):
                                                 Cookies
                                             ) VALUES (?, ?, ?, ?)
                                         """, (sub, name, number, device_id))
-                                        # Insert with default empty notes
                                         cursor.execute("""
                                             INSERT INTO TimeClock (
                                                 SubContractor, 
@@ -267,7 +263,7 @@ if st.session_state.get("fetch_location"):
                                             st.session_state["lat_float"], 
                                             st.session_state["lon_float"], 
                                             device_id,
-                                            ""  # Default empty notes for registration
+                                            ""  # Default empty notes
                                         ))
                                         conn.commit()
                                         st.session_state.update({
