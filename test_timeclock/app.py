@@ -139,10 +139,13 @@ if st.session_state.get("fetch_location"):
                                 with get_connection() as conn:
                                     with conn.cursor() as cursor:
                                         now = datetime.now()
+                                        # Update with notes and use device_id for safety
                                         cursor.execute("""
-                                            UPDATE TimeClock SET ClockOut = ? 
-                                            WHERE Number = ? AND ClockOut IS NULL
-                                        """, (now, st.session_state["user_number"]))
+                                            UPDATE TimeClock SET 
+                                            ClockOut = ?,
+                                            ClockOutNotes = ?
+                                            WHERE Cookie = ? AND ClockOut IS NULL
+                                        """, (now, clock_out_notes, device_id))
                                         conn.commit()
                                         st.session_state["clocked_in"] = False
                                         st.markdown(f'<div class="centered-container"><div class="status-message">👋 Clocked out at <span class="time-highlight">{now.strftime("%H:%M:%S")}</span></div></div>', unsafe_allow_html=True)
@@ -164,11 +167,28 @@ if st.session_state.get("fetch_location"):
                                 with get_connection() as conn:
                                     with conn.cursor() as cursor:
                                         now = datetime.now()
+                                        # Insert with notes
                                         cursor.execute("""
-                                            INSERT INTO TimeClock (SubContractor, Employee, Number, ClockIn, Lat, Lon, Cookie)
-                                            VALUES (?, ?, ?, ?, ?, ?, ?)
-                                        """, (sub, st.session_state["user_name"], st.session_state["user_number"], 
-                                            now, st.session_state["lat_float"], st.session_state["lon_float"], device_id))
+                                            INSERT INTO TimeClock (
+                                                SubContractor, 
+                                                Employee, 
+                                                Number, 
+                                                ClockIn, 
+                                                Lat, 
+                                                Lon, 
+                                                Cookie,
+                                                ClockInNotes
+                                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                        """, (
+                                            sub, 
+                                            st.session_state["user_name"], 
+                                            st.session_state["user_number"], 
+                                            now, 
+                                            st.session_state["lat_float"], 
+                                            st.session_state["lon_float"], 
+                                            device_id,
+                                            clock_in_notes
+                                        ))
                                         conn.commit()
                                         st.session_state["clocked_in"] = True
                                         st.markdown(f'<div class="centered-container"><div class="status-message">✅ Clocked in at <span class="time-highlight">{now.strftime("%H:%M:%S")}</span></div></div>', unsafe_allow_html=True)
@@ -220,14 +240,35 @@ if st.session_state.get("fetch_location"):
                                     if name and st.button("✅ Register & Clock In"):
                                         now = datetime.now()
                                         cursor.execute("""
-                                            INSERT INTO SubContractorEmployees (SubContractor, Employee, Number, Cookies)
-                                            VALUES (?, ?, ?, ?)
+                                            INSERT INTO SubContractorEmployees (
+                                                SubContractor, 
+                                                Employee, 
+                                                Number, 
+                                                Cookies
+                                            ) VALUES (?, ?, ?, ?)
                                         """, (sub, name, number, device_id))
+                                        # Insert with default empty notes
                                         cursor.execute("""
-                                            INSERT INTO TimeClock (SubContractor, Employee, Number, ClockIn, Lat, Lon, Cookie)
-                                            VALUES (?, ?, ?, ?, ?, ?, ?)
-                                        """, (sub, name, number, now, 
-                                            st.session_state["lat_float"], st.session_state["lon_float"], device_id))
+                                            INSERT INTO TimeClock (
+                                                SubContractor, 
+                                                Employee, 
+                                                Number, 
+                                                ClockIn, 
+                                                Lat, 
+                                                Lon, 
+                                                Cookie,
+                                                ClockInNotes
+                                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                        """, (
+                                            sub, 
+                                            name, 
+                                            number, 
+                                            now, 
+                                            st.session_state["lat_float"], 
+                                            st.session_state["lon_float"], 
+                                            device_id,
+                                            ""  # Default empty notes for registration
+                                        ))
                                         conn.commit()
                                         st.session_state.update({
                                             "registered": True,
@@ -240,7 +281,6 @@ if st.session_state.get("fetch_location"):
                                         st.rerun()
             except Exception as e:
                 st.error(f"Database error: {str(e)}")
-
 
 # Existing stored location handling
 elif "lat" in st.session_state and "lon" in st.session_state:
