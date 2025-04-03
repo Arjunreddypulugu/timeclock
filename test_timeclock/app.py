@@ -22,7 +22,7 @@ st.markdown(f"""
     <img src="https://vdrs.com/wp-content/uploads/2022/08/VDRS-lockup-mod-8-19-22-350.png" style="max-width: 300px; display: block; margin: 0 auto;">
 </div>
 """, unsafe_allow_html=True)
-st.markdown('<div class="main-header"><h1>🕒 Time Clock</h1></div>', unsafe_allow_html=True)
+st.markdown('<div class="centered-container"><h1>🕒 Time Clock</h1></div>', unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
 # 1. Device identification
