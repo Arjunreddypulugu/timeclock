@@ -21,8 +21,11 @@ class DBConnection:
         
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.conn:
-            self.conn.close()
+            # Instead of closing, reset the connection
+            self.conn.commit()
+            if self.conn.closed:  # Only reset if connection is still open
+                self.conn.close()
 
-@st.cache_resource(ttl=300, max_entries=20)  # Recycle connections every 5 minutes
+# Remove caching completely
 def get_connection():
     return DBConnection()
