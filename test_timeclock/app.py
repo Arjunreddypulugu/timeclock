@@ -125,6 +125,14 @@ if st.session_state.get("fetch_location"):
                     if st.session_state.get("clocked_in"):
                         # Clock Out UI
                         st.markdown('<div class="centered-container"><div class="status-message">⏱️ Current Status: Clocked In</div></div>', unsafe_allow_html=True)
+
+                        # Add Clock Out Notes
+                        clock_out_notes = st.text_area(
+                            "📝 Add closing notes:",
+                            placeholder="Describe work completed or any issues...",
+                            key="clock_out_notes"
+                        )
+        
                         col1, col2, col3 = st.columns([1, 2, 1])
                         with col2:
                             if st.button("🚪 Clock Out"):
@@ -142,6 +150,14 @@ if st.session_state.get("fetch_location"):
                     else:
                         # Clock In UI
                         st.markdown('<div class="centered-container"><div class="status-message">⏱️ Current Status: Not Clocked In</div></div>', unsafe_allow_html=True)
+
+                        # Add Clock In Notes
+                        clock_in_notes = st.text_area(
+                            "📝 Add opening notes:",
+                            placeholder="Describe planned work or special instructions...",
+                            key="clock_in_notes"
+                        )
+                        
                         col1, col2, col3 = st.columns([1, 2, 1])
                         with col2:
                             if st.button("⏱️ Clock In"):
